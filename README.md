@@ -6,6 +6,21 @@
 ![Platforms](https://img.shields.io/badge/Platforms-Win32%20and%20Win64-red.svg)
 ![Auto Install](https://img.shields.io/badge/-Auto%20Install%20App-orange.svg)
 
+- [Description](#description)
+- [Installing](#installing)
+- [Server Component](#server-component)
+- [Client Component](#client-component)
+
+## Description
+
+These components allows you to establish TCP Socket asynchronous communication between computers on LAN network or the Internet.
+
+The DzTCPServer and DzTCPClient uses *TClientSocket* and *TServerSocket* of System.Win.ScktComp unit. These classes is available on Delphi, but is a little difficult to implement because you need to read and write buffer data and there are not many resources available.
+
+The usage is very simple. You gonna need to drop the server component on server-side app and the client component on client-side app and start coding the command messages.
+
+You can do a lot of stuff, like chat app, remote commands app, remote monitoring app, and even send streams like files. The sky is the limit. :wink:
+
 ## Installing
 
 ### Auto install
@@ -21,16 +36,6 @@ Close Delphi IDE and run **CompInstall.exe** app to auto install component into 
 5. Add sub-path Win32\Release to the Library paths at Tools\Options using 32-bit option, and if you have compiled to 64 bit platform, add sub-path Win64\Release using 64-bit option.
 
 Supports Delphi XE2..Delphi 10.3 Rio
-
-## Description
-
-These components allows you to establish TCP Socket asynchronous communication between computers on LAN network or the Internet.
-
-The DzTCPServer and DzTCPClient uses *TClientSocket* and *TServerSocket* of System.Win.ScktComp unit. These classes is available on Delphi, but is a little difficult to implement because you need to read and write buffer data and there are not many resources available.
-
-The usage is very simple. You gonna need to drop the server component on server-side app and the client component on client-side app and start coding the command messages.
-
-You can do a lot of stuff, like chat app, remote commands app, remote monitoring app, and even send streams like files. The sky is the limit. :wink:
 
 ## Server Component
 
