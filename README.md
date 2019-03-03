@@ -108,14 +108,16 @@ begin
   Server.Lock;
   try
     for CSock in Server do
-	begin
-	  //...
-	end;
+    begin
+      //...
+    end;
   finally
     Server.Unlock;
   end;
 end;
 ```
+
+> Also, the TDzTCPServer component has a default enumerator pointing to the Connections List, resulting in a TDzSocket object. So you can iterate the connection list using a `for .. in` statement, just like the previous example.
 
 ```delphi
 procedure Send(Socket: TDzSocket; const Cmd: Char; const A: String = '');
