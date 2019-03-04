@@ -6,6 +6,8 @@
 ![Platforms](https://img.shields.io/badge/Platforms-Win32%20and%20Win64-red.svg)
 ![Auto Install](https://img.shields.io/badge/-Auto%20Install%20App-orange.svg)
 
+![Demo Example](images/demo_example.png)
+
 - [Description](#description)
 - [Installing](#installing)
 - [Server Component](#server-component)
