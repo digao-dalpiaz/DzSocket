@@ -23,6 +23,24 @@ The usage is very simple. You gonna need to drop the server component on server-
 
 You can do a lot of stuff, like chat app, remote commands app, remote monitoring app, and even send streams like files. The sky is the limit. :wink:
 
+## Delphi native component differences
+
+- **Cache structure**: When you are using Delphi native socket component, If you send multiple messages simultaneously, the recipient may receive the messages grouped or divided, so you need always to deal with this problem. DzSocket controls socket messages automatically, so you always receive one event per message.
+
+- **KeepAlive**: When you establish a socket connection, if one side of connection is lost, the other side will not be communicated until a new message attempts to be send. So you can implement a manual ping, but this will give a lot of unnecessary work. DzSocket has the KeepAlive resource, enabling network native keep-alive protocol.
+
+- **Commands**: The native socket allows you to send string segment, but if you want to send commands and identify this commands in the other side of the connection, you will need to manually implement this. With DzSocket, you have a Char command always available. Ready, fast and easy.
+
+- **Auto Free Data Objects on Server**: The Client object list available on Server component has a Pointer property, allowing you to store informations about the client connection, usually using a object. With DzSocket, you don't need to worry about this object destruction. You just need to enable a property to take care of these objects.
+
+- **Enumerator**: The native Server component does not have a enumerator to iterate Client List connections. Using DzSocket, you can simply do a `for .. in` directly on Server component, iterating client list connections.
+
+- **SendAll**: Easily send command to all clients. Besides that, you can use `SendAllEx` to send command to all clients except a specific client connection.
+
+- **Connection Monitor**: There is a Connection Lost event allowing you to know when the connection was closed without the client request.
+
+And much more! :wink:
+
 ## Installing
 
 ### Auto install
