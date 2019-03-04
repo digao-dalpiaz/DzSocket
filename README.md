@@ -9,6 +9,7 @@
 ![Demo Example](images/demo_example.png)
 
 - [Description](#description)
+- [Delphi native component differences](#delphi-native-component-differences)
 - [Installing](#installing)
 - [Server Component](#server-component)
 - [Client Component](#client-component)
