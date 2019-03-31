@@ -116,7 +116,7 @@ Turn Off the server listening socket port.
 
 ```delphi
 procedure Lock;
-procedure Onlock;
+procedure Unlock;
 ```
 
 Use these methods to iterate the Connections list (thread-safe), because a connection may be closed when you are iterating the connection list.

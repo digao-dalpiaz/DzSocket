@@ -25,7 +25,7 @@ interface
 
  CACHE:
  When sending long messages or consecutive messages, it may be received by
- recipient in parts. So a chache is needed to store parts of message util
+ recipient in parts. So a cache is needed to store parts of message until
  the message is complete.
 
  KEEPALIVE:
@@ -39,7 +39,7 @@ interface
  are not received automatically. A reading loop is needed using Blocking mode.
 
  Winsock/Winsock2:
- All the socket communication is based on WinSock, which is either recerenced
+ All the socket communication is based on WinSock, which is either referenced
  in ScktComp. The Winsock2 is only used by KeepAlive function.
 }
 
@@ -334,7 +334,7 @@ begin
           EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
     end;
 
-    {The final Read event is not togheter with buffer receive because it
+    {The final Read event is not together with buffer receive because it
     can't determine how long the Read event will take, depending on programmer
     codes, so its only fired after all buffer receivement is done, avoiding
     messages parts overload.}
