@@ -49,7 +49,7 @@ You can do a lot of stuff, like chat app, remote commands app, remote monitoring
 
 - **Connection Monitor**: There is a Connection Lost event allowing you to know when the connection was closed without the client request.
 
-- **Unicode support**: The Delphi native component does not support to send messages using unicode strings, unless you write your own code to convert data stream on the both sides. This is really boring and takes time. Usinh DzSocket you can simply send message text using directly method parameter as string type, so Delphi will consider Unicode characters as WideString by default.
+- **Unicode support**: The Delphi native component does not support to send messages using unicode strings, unless you write your own code to convert data stream on the both sides. This is really boring and takes time. Using DzSocket you can simply send message text using directly method parameter as string type, so Delphi will consider Unicode characters as WideString by default.
 
 And much more! :wink:
 
