@@ -55,7 +55,7 @@ type
 
   TDzSocketCache = class
   private
-    Data: String;
+    Data: AnsiString;
     Size: Integer;
   end;
 
@@ -212,7 +212,7 @@ procedure Register;
 
 implementation
 
-uses System.SysUtils, Winapi.Winsock2;
+uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections;
 
 procedure Register;
 begin
@@ -273,23 +273,48 @@ begin
   Move(Value, Result[1], STRUCT_MSGSIZE);
 end;
 
-function StringToSize(const Value: String): TSockMsgSize;
-var AnsiValue: AnsiString;
+function StringToSize(const Value: AnsiString): TSockMsgSize;
+var mv_Value: AnsiString;
 begin
-  AnsiValue := AnsiString(Value);
-  Move(AnsiValue[1], Result, STRUCT_MSGSIZE);
+  mv_Value := Value;
+  Move(mv_Value[1], Result, STRUCT_MSGSIZE);
 end;
 
 const CHAR_IDENT_MSG = #2;
 procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
    EvRead: TDzSocketReadEvent; EvError: TDzSocketErrorEvent);
-var PCache: PSockCache;
-    Cache: TDzSocketCache;
-    Buf, A: String;
-    LMsgs: TStringList;
-    ReadSize: Integer;
+
+  procedure ReadPart(const A: AnsiString);
+  var
+    SU, SA: TStringStream;
+    W: String;
+  begin
+    SU := TStringStream.Create('', TEncoding.Unicode);
+    try
+      SA := TStringStream.Create(A);
+      try
+        SU.LoadFromStream(SA); //convert to Unicode
+      finally
+        SA.Free;
+      end;
+
+      W := SU.DataString;
+    finally
+      SU.Free;
+    end;
+
+    if Assigned(EvRead) then
+      EvRead(Comp, TDzSocket(Socket), W[1], W.Remove(0{0-based}, 1));
+  end;
+
+var
+  PCache: PSockCache;
+  Cache: TDzSocketCache;
+  Buf, A: AnsiString;
+  LMsgs: TList<AnsiString>;
+  ReadSize: Integer;
 begin
-  Buf := WideString(Socket.ReceiveText); //read socket buffer
+  Buf := Socket.ReceiveText; //read socket buffer
 
   PCache := GetCachePointer(Comp, Socket); //get cache pointer
   if not Assigned(PCache^) then
@@ -297,14 +322,14 @@ begin
 
   Cache := PCache^;
 
-  LMsgs := TStringList.Create;
+  LMsgs := TList<AnsiString>.Create;
   try
     try
-      while not Buf.IsEmpty do
+      while Buf<>EmptyAnsiStr do
       begin
         if Cache.Size>0 then //should be here first
         begin
-          ReadSize := Buf.Length;
+          ReadSize := Length(Buf);
           if Cache.Size<ReadSize then ReadSize := Cache.Size;
           Cache.Data := Cache.Data + Copy(Buf, 1, ReadSize);
           Delete(Buf, 1, ReadSize);
@@ -340,10 +365,7 @@ begin
     messages parts overload.}
 
     for A in LMsgs do
-    begin
-      if Assigned(EvRead) then
-        EvRead(Comp, TDzSocket(Socket), A[1], A.Remove(0{0-based}, 1));
-    end;
+      ReadPart(A);
 
   finally
     LMsgs.Free;
@@ -351,11 +373,24 @@ begin
 end;
 
 procedure SockSend(Socket: TCustomWinSocket; const Cmd: Char; const A: String);
-var Msg: String;
+var
+  SU, SA: TStringStream;
+  ansiData: AnsiString;
 begin
-  Msg := Cmd+A;
+  SA := TStringStream.Create;
+  try
+    SU := TStringStream.Create(Cmd+A, TEncoding.Unicode);
+    try
+      SA.LoadFromStream(SU); //convert to Ansi
+    finally
+      SU.Free;
+    end;
+    ansiData := AnsiString(SA.DataString);
+  finally
+    SA.Free;
+  end;
 
-  Socket.SendText(CHAR_IDENT_MSG+SizeToString(Msg.Length)+AnsiString(Msg));
+  Socket.SendText(CHAR_IDENT_MSG+SizeToString(Length(ansiData))+ansiData);
 end;
 {$ENDREGION}
 

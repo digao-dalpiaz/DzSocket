@@ -1,18 +1,27 @@
 # DzSocket
 
-## Delphi TCP Socket Client and Server communication
+## Delphi TCP Socket Client and Server communication with Unicode support
 
 ![Delphi Supported Versions](https://img.shields.io/badge/Delphi%20Supported%20Versions-XE2..10.3%20Rio-blue.svg)
 ![Platforms](https://img.shields.io/badge/Platforms-Win32%20and%20Win64-red.svg)
 ![Auto Install](https://img.shields.io/badge/-Auto%20Install%20App-orange.svg)
+![Unicode support](https://img.shields.io/badge/-Unicode%20messages%20support-green.svg)
 
 ![Demo Example](images/demo_example.png)
 
+- [What's New](#whats-new)
 - [Description](#description)
 - [Delphi native component differences](#delphi-native-component-differences)
 - [Installing](#installing)
 - [Server Component](#server-component)
 - [Client Component](#client-component)
+- [How to send stream](#how-to-send-stream)
+
+## What's New
+
+- 03/31/2019
+
+   - Include support to Unicode characters on commands and messages text
 
 ## Description
 
@@ -235,3 +244,6 @@ procedure Send(const Cmd: Char; const A: String = '');
 
 Sends commands and messages to the server. You should use `Cmd` parameter to specify a command character, that will be received by the server. The `A` parameter is optional and allows you to specify a message text.
 
+## How to send stream
+
+Please check the demo application and look the **Send Print** command to know how to send and receive data stream, and also using compression to increase communication speed. :wink:
