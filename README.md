@@ -27,7 +27,7 @@
 
 These components allows you to establish TCP Socket asynchronous communication between computers on LAN network or the Internet.
 
-The DzTCPServer and DzTCPClient uses *TClientSocket* and *TServerSocket* of System.Win.ScktComp unit. These classes is available on Delphi, but is a little difficult to implement because you need to read and write buffer data and there are not many resources available.
+The DzTCPServer and DzTCPClient uses *TClientSocket* and *TServerSocket* of System.Win.ScktComp unit. These classes are available on Delphi, but is a little difficult to implement because you need to read and write buffer data and there are not many resources available.
 
 The usage is very simple. You gonna need to drop the server component on server-side app and the client component on client-side app and start coding the command messages.
 

@@ -361,7 +361,7 @@ begin
 
     {The final Read event is not together with buffer receive because it
     can't determine how long the Read event will take, depending on programmer
-    codes, so its only fired after all buffer receivement is done, avoiding
+    codes, so its only fired after all buffer receiving is done, avoiding
     messages parts overload.}
 
     for A in LMsgs do
