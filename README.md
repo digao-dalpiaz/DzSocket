@@ -21,7 +21,7 @@
 
 - 04/19/2020
 
-   - Fixed Client Error event behavior to occur after internal operations (issue #3).
+   - Fixed Client Error event behavior to occur after internal operations. Possible behavior changing. Check issue #3. :warning:
 
 - 03/31/2019
 
