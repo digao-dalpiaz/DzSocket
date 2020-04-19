@@ -466,6 +466,8 @@ var I: Integer;
 begin
   for I := 0 to LUsers.Count-1 do
     LUsers.Items.Objects[I].Free;
+
+  LUsers.Clear;
 end;
 
 procedure TFrm.BtnSendPrintClick(Sender: TObject);
