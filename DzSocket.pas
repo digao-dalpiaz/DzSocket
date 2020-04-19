@@ -534,16 +534,16 @@ end;
 procedure TDzTCPClient.int_OnError(Sender: TObject; Socket: TCustomWinSocket;
   ErrorEvent: TErrorEvent; var ErrorCode: Integer);
 begin
+  case ErrorEvent of
+    eeConnect: DoEvDisconnect(False); //error on connection
+    eeDisconnect: C.Close; //this error caused a disconnection
+  end;
+
   if Assigned(FOnError) then
   begin
     FOnError(Self, TDzSocket(Socket), ErrorEvent, ErrorCode, GetSocketErrorMsg(ErrorCode));
 
     ErrorCode := 0;
-  end;
-
-  case ErrorEvent of
-    eeConnect: DoEvDisconnect(False); //error on connection
-    eeDisconnect: C.Close; //this error caused a disconnection
   end;
 end;
 {$ENDREGION}

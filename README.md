@@ -19,6 +19,10 @@
 
 ## What's New
 
+- 04/19/2020
+
+   - Fixed Client Error event behavior to occur after internal operations (issue #3).
+
 - 03/31/2019
 
    - Include support to Unicode characters on commands and messages text
