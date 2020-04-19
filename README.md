@@ -22,6 +22,7 @@
 - 04/19/2020
 
    - Fixed Client Error event behavior to occur after internal operations. Possible behavior changing. Check issue #3. :warning:
+   - Implemented SendAllOnlyWithData public property.
 
 - 03/31/2019
 
@@ -77,6 +78,8 @@ Supports Delphi XE2..Delphi 10.3 Rio
 
 ### Server Properties
 
+`AutoFreeObjs: Boolean` (public)  = If you are using `Data` property of client sockets on server to assign objects, you may enable this option, so the component will take care of object destruction when client socket ends. Remember, if this option is enabled and the Data property of socket is assigned, the component will presume always Data as object.
+
 `KeepAlive: Boolean` = Allow enable KeepAlive socket native resource. This will send a keep-alive signal using KeepAliveInterval property.
 
 `KeepAliveInterval: Integer` = Specify the KeepAlive interval in milliseconds (default 15000 / *15 seconds*).
@@ -86,6 +89,8 @@ Supports Delphi XE2..Delphi 10.3 Rio
 `Connection[Index: Integer]: TDzSocket` (public) = Returns the TDzSocket client connection object by Index.
 
 `Count: Integer` (public) = Returns the client connections list count.
+
+`SendAllOnlyWithData: Boolean` (public) = When using `SendAll` or `SendAllEx` methods, if this property is enabled, so the server will send messages only to clients having `Data` property assigned.
 
 ### Server Events
 

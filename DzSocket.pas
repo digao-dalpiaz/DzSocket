@@ -176,6 +176,7 @@ type
     function GetCount: Integer;
   public
     AutoFreeObjs: Boolean;
+    SendAllOnlyWithData: Boolean;
 
     constructor Create(AOwner: TComponent); override;
 
@@ -620,8 +621,14 @@ begin
   Lock;
   try
     for Sock in Self do
-      if Sock<>Exclude then
-        Send(Sock, Cmd, A);
+    begin
+      if Sock=Exclude then Continue;
+
+      if SendAllOnlyWithData then
+        if Sock.Data=nil then Continue;
+
+      Send(Sock, Cmd, A);
+    end;
   finally
     Unlock;
   end;
