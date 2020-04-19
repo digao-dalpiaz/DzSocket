@@ -538,6 +538,12 @@ begin
   case ErrorEvent of
     eeConnect: DoEvDisconnect(False); //error on connection
     eeDisconnect: C.Close; //this error caused a disconnection
+    eeLookup:
+    begin
+      //when Lookup error, the socket will fire OnDisconnect, but we need to know that was not connected yet.
+      C.OnDisconnect := nil; //after this the internal socket will be recreated anyway.
+      DoEvDisconnect(False);
+    end;
   end;
 
   if Assigned(FOnError) then

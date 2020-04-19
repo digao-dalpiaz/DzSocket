@@ -23,6 +23,7 @@
 
    - Fixed Client Error event behavior to occur after internal operations. Possible behavior changing. Check issue #3. :warning:
    - Implemented SendAllOnlyWithData public property.
+   - Fixed connection Lookup error to bring OnDisconnect with WasConnected=False.
 
 - 03/31/2019
 
