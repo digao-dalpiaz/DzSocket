@@ -456,8 +456,8 @@ begin
   I := FindUser(StrToInt(A));
   if I<>-1 then
   begin
-    L.Items.Objects[I].Free;
-    L.Items.Delete(I);
+    LUsers.Items.Objects[I].Free;
+    LUsers.Items.Delete(I);
   end;
 end;
 
