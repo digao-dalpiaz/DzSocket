@@ -75,7 +75,7 @@ begin
     end;
 
     FrmPrint.Img.Picture.Assign(B);
-    FrmPrint.Caption := Format('Screenshot received - %s / Buffer: %d',
+    FrmPrint.Caption := Format('Screenshot received - %s / Buffer Length: %d',
       [FormatDateTime('hh:nn:ss.zzz', Now), A.Length]);
     FrmPrint.Show;
 

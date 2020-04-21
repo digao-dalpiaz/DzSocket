@@ -5,16 +5,18 @@ interface
 uses DzSocket;
 
 type
+  //Class for list of clients in Server
   TClient = class
     Name, DNS: String;
   end;
 
+  //Class for list of clients in Client
   TUser = class
     ID: TSocket;
     Name: String;
   end;
 
-function GetSelSock: TDzSocket;
+function GetSelSocketInServer: TDzSocket;
 
 function GetUser(Index: Integer): TUser;
 function FindUser(ID: TSocket): Integer;
@@ -23,9 +25,9 @@ implementation
 
 uses UFrm;
 
-function GetSelSock: TDzSocket;
+function GetSelSocketInServer: TDzSocket;
 begin
-  Result := TDzSocket(Frm.L.Items.Objects[Frm.L.ItemIndex]);
+  Result := TDzSocket(Frm.LCon.Items.Objects[Frm.LCon.ItemIndex]);
 end;
 
 function GetUser(Index: Integer): TUser;
@@ -38,7 +40,7 @@ var I: Integer;
 begin
   Result := -1;
 
-  for I := 0 to Frm.LUsers.Count-1 do
+  for I := Frm.LUsers.Count-1 downto 0 do
   begin
     if GetUser(I).ID = ID then
     begin

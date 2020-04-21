@@ -18,63 +18,63 @@ object Frm: TFrm
   OnDestroy = FormDestroy
   PixelsPerInch = 96
   TextHeight = 13
-  object Label1: TLabel
+  object LbServerPort: TLabel
     Left = 8
     Top = 8
     Width = 20
     Height = 13
     Caption = 'Port'
   end
-  object Label2: TLabel
+  object LbServerConnections: TLabel
     Left = 8
     Top = 56
     Width = 59
     Height = 13
     Caption = 'Connections'
   end
-  object Label3: TLabel
+  object LbClientName: TLabel
     Left = 504
     Top = 48
     Width = 27
     Height = 13
     Caption = 'Name'
   end
-  object Label4: TLabel
+  object LbClientPort: TLabel
     Left = 632
     Top = 8
     Width = 20
     Height = 13
     Caption = 'Port'
   end
-  object Label5: TLabel
+  object LbClientHost: TLabel
     Left = 504
     Top = 8
     Width = 22
     Height = 13
     Caption = 'Host'
   end
-  object Label6: TLabel
+  object LbClientUsers: TLabel
     Left = 504
     Top = 88
     Width = 27
     Height = 13
     Caption = 'Users'
   end
-  object Label7: TLabel
+  object LbServerLog: TLabel
     Left = 8
     Top = 200
     Width = 52
     Height = 13
     Caption = 'Server Log'
   end
-  object Label8: TLabel
+  object LbClientLog: TLabel
     Left = 504
     Top = 200
     Width = 47
     Height = 13
     Caption = 'Client Log'
   end
-  object Bevel1: TBevel
+  object Divider: TBevel
     Left = 496
     Top = 8
     Width = 9
@@ -216,7 +216,7 @@ object Frm: TFrm
     Font.Style = []
     ParentFont = False
     ScrollBars = ssBoth
-    TabOrder = 6
+    TabOrder = 7
     WordWrap = False
   end
   object C_Memo: TMemo
@@ -231,7 +231,7 @@ object Frm: TFrm
     Font.Style = []
     ParentFont = False
     ScrollBars = ssBoth
-    TabOrder = 16
+    TabOrder = 17
     WordWrap = False
   end
   object S_Cmd: TEdit
@@ -239,8 +239,9 @@ object Frm: TFrm
     Top = 480
     Width = 25
     Height = 21
+    Enabled = False
     MaxLength = 1
-    TabOrder = 7
+    TabOrder = 8
     Text = 'M'
   end
   object S_Msg: TEdit
@@ -248,7 +249,7 @@ object Frm: TFrm
     Top = 480
     Width = 449
     Height = 21
-    TabOrder = 8
+    TabOrder = 9
     OnKeyPress = S_MsgKeyPress
   end
   object C_Cmd: TEdit
@@ -256,8 +257,9 @@ object Frm: TFrm
     Top = 480
     Width = 25
     Height = 21
+    Enabled = False
     MaxLength = 1
-    TabOrder = 17
+    TabOrder = 18
     Text = 'M'
   end
   object C_Msg: TEdit
@@ -265,25 +267,25 @@ object Frm: TFrm
     Top = 480
     Width = 449
     Height = 21
-    TabOrder = 18
+    TabOrder = 19
     OnKeyPress = C_MsgKeyPress
   end
-  object L: TListBox
+  object LCon: TListBox
     Left = 8
     Top = 72
     Width = 481
     Height = 121
     Style = lbOwnerDrawFixed
     ItemHeight = 18
-    TabOrder = 5
-    OnDrawItem = LDrawItem
+    TabOrder = 6
+    OnDrawItem = LConDrawItem
   end
   object EdHost: TEdit
     Left = 504
     Top = 24
     Width = 121
     Height = 21
-    TabOrder = 9
+    TabOrder = 10
     Text = 'localhost'
   end
   object BtnSendAll: TBitBtn
@@ -424,7 +426,7 @@ object Frm: TFrm
     Top = 64
     Width = 121
     Height = 21
-    TabOrder = 13
+    TabOrder = 14
     Text = 'User_Test'
   end
   object EdClientPort: TEdit
@@ -433,7 +435,7 @@ object Frm: TFrm
     Width = 57
     Height = 21
     NumbersOnly = True
-    TabOrder = 10
+    TabOrder = 11
     Text = '7777'
   end
   object BtnClientDisconnect: TBitBtn
@@ -495,7 +497,7 @@ object Frm: TFrm
       E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8
       E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8}
     NumGlyphs = 2
-    TabOrder = 12
+    TabOrder = 13
     OnClick = BtnClientDisconnectClick
   end
   object BtnClientConnect: TBitBtn
@@ -556,7 +558,7 @@ object Frm: TFrm
       E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8
       E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8}
     NumGlyphs = 2
-    TabOrder = 11
+    TabOrder = 12
     OnClick = BtnClientConnectClick
   end
   object BtnSendPrint: TBitBtn
@@ -617,7 +619,7 @@ object Frm: TFrm
       8989898989CCCCCC8989E8E8E8E8E8E8E8E8E8E8E8818181E8E8898989898989
       89898989898989898989E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8}
     NumGlyphs = 2
-    TabOrder = 15
+    TabOrder = 16
     TabStop = False
     OnClick = BtnSendPrintClick
   end
@@ -626,8 +628,9 @@ object Frm: TFrm
     Top = 24
     Width = 45
     Height = 28
+    TabStop = False
     Caption = 'Loop Print'
-    TabOrder = 19
+    TabOrder = 5
     WordWrap = True
   end
   object LUsers: TListBox
@@ -637,7 +640,7 @@ object Frm: TFrm
     Height = 89
     Style = lbOwnerDrawFixed
     ItemHeight = 18
-    TabOrder = 14
+    TabOrder = 15
     OnDrawItem = LUsersDrawItem
   end
   object C: TDzTCPClient

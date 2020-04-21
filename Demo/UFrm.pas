@@ -19,7 +19,7 @@ type
     S_Msg: TEdit;
     C_Cmd: TEdit;
     C_Msg: TEdit;
-    L: TListBox;
+    LCon: TListBox;
     EdHost: TEdit;
     BtnSendAll: TBitBtn;
     C: TDzTCPClient;
@@ -31,9 +31,9 @@ type
     BtnSendPrint: TBitBtn;
     CkLoopPrint: TCheckBox;
     LUsers: TListBox;
-    Label7: TLabel;
-    Label8: TLabel;
-    Bevel1: TBevel;
+    LbServerLog: TLabel;
+    LbClientLog: TLabel;
+    Divider: TBevel;
     procedure FormCreate(Sender: TObject);
     procedure BtnOnServerClick(Sender: TObject);
     procedure BtnOffServerClick(Sender: TObject);
@@ -43,7 +43,7 @@ type
     procedure S_MsgKeyPress(Sender: TObject; var Key: Char);
     procedure BtnSendAllClick(Sender: TObject);
     procedure BtnKillClick(Sender: TObject);
-    procedure LDrawItem(Control: TWinControl; Index: Integer; Rect: TRect;
+    procedure LConDrawItem(Control: TWinControl; Index: Integer; Rect: TRect;
       State: TOwnerDrawState);
     procedure LUsersDrawItem(Control: TWinControl; Index: Integer; Rect: TRect;
       State: TOwnerDrawState);
@@ -74,7 +74,7 @@ type
     procedure ClientsListReceived(const A: String);
     procedure AddUser(const A: String);
     procedure DelUser(const A: String);
-    procedure ClearUsers;
+    procedure ClearClientUsers;
   end;
 
 var
@@ -91,7 +91,7 @@ procedure TFrm.FormCreate(Sender: TObject);
 begin
   ReportMemoryLeaksOnShutdown := True;
 
-  S.AutoFreeObjs := True;
+  S.AutoFreeObjs := True; //auto free server connections Data property
 
   //--Disable WordWrap because of long text result on slow performance
   S_Memo.WordWrap := False;
@@ -112,7 +112,10 @@ end;
 
 procedure TFrm.FormDestroy(Sender: TObject);
 begin
-  ClearUsers;
+  //When destroying, ensure client users list objects release
+  ClearClientUsers;
+
+  //Important: the server connections Data objects are not released here because using AutoFreeObjs in Server
 end;
 
 procedure TFrm.DoSound;
@@ -120,21 +123,21 @@ begin
   PlaySound('PLING', HInstance, SND_RESOURCE or SND_ASYNC);
 end;
 
-procedure TFrm.LDrawItem(Control: TWinControl; Index: Integer; Rect: TRect;
+procedure TFrm.LConDrawItem(Control: TWinControl; Index: Integer; Rect: TRect;
   State: TOwnerDrawState);
 
 var
   Sock: TDzSocket;
   C: TClient;
 begin
-  L.Canvas.Font.Color := clBlack;
-  if odSelected in State then L.Canvas.Brush.Color := clYellow;
-  L.Canvas.FillRect(Rect);
+  LCon.Canvas.Font.Color := clBlack;
+  if odSelected in State then LCon.Canvas.Brush.Color := clYellow;
+  LCon.Canvas.FillRect(Rect);
 
-  Sock := TDzSocket(L.Items.Objects[Index]);
+  Sock := TDzSocket(LCon.Items.Objects[Index]);
   C := Sock.Data;
 
-  L.Canvas.TextOut(3, Rect.Top+2, Format('%d: %s [%s] > %s',
+  LCon.Canvas.TextOut(3, Rect.Top+2, Format('%d: %s [%s] > %s',
     [Sock.ID, C.DNS, Sock.RemoteAddress, C.Name]));
 end;
 
@@ -187,7 +190,8 @@ begin
 
   LogServer('Server down');
 
-  L.Clear; //clear clients
+  LCon.Clear; //clear connections list
+  //Important: the Data object of connections are not released here beacuse using AutoFreeObjs in Server
 
   EdServerPort.Enabled := True;
   BtnOnServer.Enabled := True;
@@ -205,7 +209,7 @@ begin
   Socket.Data := C;
   C.DNS := Socket.RemoteHost; //slow function
 
-  L.Items.AddObject('', Socket);
+  LCon.Items.AddObject('', Socket);
 end;
 
 procedure TFrm.SClientDisconnect(Sender: TObject; Socket: TDzSocket);
@@ -213,8 +217,8 @@ var Index: Integer;
 begin
   LogServer(Format('Socket %d disconnected', [Socket.ID]));
 
-  Index := L.Items.IndexOfObject(Socket);
-  if Index<>-1 then L.Items.Delete(Index);
+  Index := LCon.Items.IndexOfObject(Socket);
+  if Index<>-1 then LCon.Items.Delete(Index);
 
   S.SendAll('D', IntToStr(Socket.ID));
 end;
@@ -235,9 +239,9 @@ begin
     'N': //name received on connect
     begin
       C.Name := A;
-      L.Invalidate;
+      LCon.Invalidate;
 
-      S.SendAllEx(Socket, 'C', Format('%d/%s', [Socket.ID, C.Name]));
+      S.SendAllEx(Socket, 'C', Format('%d/%s', [Socket.ID, C.Name])); //send connection to other clients
       Socket.Send('L', GetClientsList); //send clients list to the client
     end;
     'P': //recebeu screenshot
@@ -265,10 +269,10 @@ begin
   begin
     Key := #0;
 
-    if L.ItemIndex=-1 then
+    if LCon.ItemIndex=-1 then
       raise Exception.Create('No client selected');
 
-    Sock := GetSelSock;
+    Sock := GetSelSocketInServer;
     C := Sock.Data;
 
     Cmd := S_Cmd.Text[1];
@@ -297,10 +301,10 @@ end;
 procedure TFrm.BtnKillClick(Sender: TObject);
 var Sock: TDzSocket;
 begin
-  if L.ItemIndex=-1 then
+  if LCon.ItemIndex=-1 then
     raise Exception.Create('No client selected');
 
-  Sock := GetSelSock;
+  Sock := GetSelSocketInServer;
   LogServer(Format('Kill socket %d', [Sock.ID]));
   Sock.Close;
 end;
@@ -379,7 +383,7 @@ begin
   EdClientPort.Enabled := True;
   EdName.Enabled := True;
 
-  ClearUsers;
+  ClearClientUsers;
 end;
 
 procedure TFrm.CError(Sender: TObject; Socket: TDzSocket;
@@ -461,7 +465,7 @@ begin
   end;
 end;
 
-procedure TFrm.ClearUsers;
+procedure TFrm.ClearClientUsers;
 var I: Integer;
 begin
   for I := 0 to LUsers.Count-1 do
