@@ -19,6 +19,10 @@
 
 ## What's New
 
+- 05/03/2020
+
+   - Updated CompInstall to version 1.2
+
 - 04/19/2020
 
    - Fixed Client Error event behavior to occur after internal operations. Possible behavior changing. Check issue #3. :warning:
