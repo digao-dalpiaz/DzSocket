@@ -19,6 +19,9 @@
 
 ## What's New
 
+   - New authentication/authorization support!!!
+   - Removed SendAllOnlyWithData property.
+
 - 07/12/2020
 
    - Increase reading speed by not change string variable multiple times.
@@ -65,6 +68,8 @@ You can do a lot of stuff, like chat app, remote commands app, remote monitoring
 
 - **Unicode support**: The Delphi native component does not support sending messages using Unicode strings, unless you write your own code to convert data stream on the both sides. This is really boring and takes time. Using DzSocket you can simply send message text using directly method parameter as string type, so Delphi will consider Unicode characters as WideString by default.
 
+- **Login control**: You can control client authentication/authorization by using simple events and you can send extra data information to control client access to the server.
+
 And much more! :wink:
 
 ## Installing
@@ -89,6 +94,8 @@ Supports Delphi XE2..Delphi 10.3 Rio
 
 `AutoFreeObjs: Boolean` (public)  = If you are using `Data` property of client sockets on server to assign objects, you may enable this option, so the component will take care of object destruction when client socket ends. Remember, if this option is enabled and the Data property of socket is assigned, the component will presume always Data as object.
 
+`EnumeratorOnlyAuth: Boolean` (public) = When using component enumerator `for in`, by-pass clients non authenticated yet. The same behavior will occur in `SendAll` and `SendAllEx` methods.
+
 `KeepAlive: Boolean` = Allow enable KeepAlive socket native resource. This will send a keep-alive signal using KeepAliveInterval property.
 
 `KeepAliveInterval: Integer` = Specify the KeepAlive interval in milliseconds (default 15000 / *15 seconds*).
@@ -98,8 +105,6 @@ Supports Delphi XE2..Delphi 10.3 Rio
 `Connection[Index: Integer]: TDzSocket` (public) = Returns the TDzSocket client connection object by Index.
 
 `Count: Integer` (public) = Returns the client connections list count.
-
-`SendAllOnlyWithData: Boolean` (public) = When using `SendAll` or `SendAllEx` methods, if this property is enabled, so the server will send messages only to clients having `Data` property assigned.
 
 ### Server Events
 
@@ -128,6 +133,21 @@ procedure OnClientRead(Sender: TObject; Socket: TDzSocket;
 ```
 
 This event is triggered when a client sends a message to the server. The `Socket` parameter is the client socket.
+
+```delphi
+procedure OnClientLoginCheck(Sender: TObject; Socket: TDzSocket; var Accept: Boolean;
+  const RequestData: String; var ResponseData: String);
+```
+
+This event is triggered when a client has just connected to the server. If at the client side, the `OnLoginRequest` is handled, the data information sent will be receiver here into the `RequestData` parameter.
+You can change the `Accept` parameter (initial default value is True) to accept or reject client connection. Besides that, you can use the `ResponseData` parameter to send to the client some data information. The accepted flag and data information will be receiver by the client at `OnLoginResponse` event.
+If the `Accept` parameter remains True, then socket `Auth` property will be set to True. Otherwise the client connection will be dropped by the server.
+
+```delphi
+procedure OnClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
+```
+
+This event is triggered right after a client is authorized into the server. Even if you are not using login events, remember: only after the client is authorized into the server, then the client can send messages. Otherwise the server will ignore any client messages.
 
 ### Server Methods
 
@@ -193,6 +213,12 @@ function FindSocketHandle(const ID: TSocket): TDzSocket;
 
 Returns the TDzSocket object by Socket Handle ID.
 
+```delphi
+function GetAuthConnections: Integer;
+```
+
+Retrieves only authenticated connections count.
+
 ## Client Component
 
 ### Client Properties
@@ -242,7 +268,20 @@ procedure OnRead(Sender: TObject; Socket: TDzSocket;
   const Cmd: Char; const A: string);
 ```
 
-This event is triggered when the server sends a message to the client.
+This event is triggered when the client receives a message from the server.
+
+```delphi
+procedure OnLoginRequest(Sender: TObject; Socket: TDzSocket; var Data: String);
+```
+
+This event is triggered right after client connects to the server. It means server is requesting login data information, so it can check this data and choose accept or drop the client connection.
+You should fill `Data` parameter if you want to handle this information on the server.
+
+```delphi
+procedure OnLoginResponse(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: String)
+```
+
+This event is triggered when server accepts or rejects the client connection. You can check this result into `Accepted` parameter, and the server may send to the client some data information into `Data` parameter.
 
 ### Client Methods
 
