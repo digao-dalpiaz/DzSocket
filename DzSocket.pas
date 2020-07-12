@@ -290,7 +290,7 @@ procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
     SU, SA: TStringStream;
     W: String;
   begin
-    SU := TStringStream.Create('', TEncoding.Unicode);
+    SU := TStringStream.Create(String.Empty, TEncoding.Unicode);
     try
       SA := TStringStream.Create(A);
       try
@@ -313,7 +313,7 @@ var
   Cache: TDzSocketCache;
   Buf, A: AnsiString;
   LMsgs: TList<AnsiString>;
-  ReadSize: Integer;
+  X, Len, ReadSize: Integer;
 begin
   Buf := Socket.ReceiveText; //read socket buffer
 
@@ -326,31 +326,30 @@ begin
   LMsgs := TList<AnsiString>.Create;
   try
     try
-      while Buf<>EmptyAnsiStr do
+      X := 1;
+      Len := Length(Buf);
+      while X<=Len do
       begin
         if Cache.Size>0 then //should be here first
         begin
-          ReadSize := Length(Buf);
+          ReadSize := Len-X+1;
           if Cache.Size<ReadSize then ReadSize := Cache.Size;
-          Cache.Data := Cache.Data + Copy(Buf, 1, ReadSize);
-          Delete(Buf, 1, ReadSize);
+          Cache.Data := Cache.Data + Copy(Buf, X, ReadSize);
           Dec(Cache.Size, ReadSize);
+          Inc(X, ReadSize);
 
           if Cache.Size=0 then //message completed
           begin
             LMsgs.Add(Cache.Data);
-            Cache.Data := '';
+            Cache.Data := EmptyAnsiStr;
           end;
         end else
-        if Buf[1]=CHAR_IDENT_MSG then
+        if Buf[X]=CHAR_IDENT_MSG then
         begin
-          Delete(Buf, 1, 1);
-
-          Cache.Size := StringToSize(Copy(Buf, 1, STRUCT_MSGSIZE));
-          Delete(Buf, 1, STRUCT_MSGSIZE);
+          Cache.Size := StringToSize(Copy(Buf, X+1, STRUCT_MSGSIZE));
+          Inc(X, 1+STRUCT_MSGSIZE);
 
           if Cache.Size<=0 then raise Exception.Create('Invalid size');
-
         end else
           raise Exception.Create('Invalid data');
       end;
@@ -446,7 +445,7 @@ procedure TDzTCPClient.Connect;
 begin
   if Connected then Exit;
 
-  if FHost='' then
+  if FHost=String.Empty then
     raise Exception.Create('Host not specified');
   if FPort=0 then
     raise Exception.Create('Port not specified');
