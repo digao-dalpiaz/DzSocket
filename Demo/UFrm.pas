@@ -65,6 +65,13 @@ type
     procedure CRead(Sender: TObject; Socket: TDzSocket; const Cmd: Char;
       const A: string);
     procedure FormDestroy(Sender: TObject);
+    procedure CLoginRequest(Sender: TObject; Socket: TDzSocket;
+      var Data: string);
+    procedure CLoginResponse(Sender: TObject; Socket: TDzSocket;
+      Accepted: Boolean; const Data: string);
+    procedure SClientLoginCheck(Sender: TObject; Socket: TDzSocket;
+      var Accept: Boolean; const RequestData: string; var ResponseData: string);
+    procedure SClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
   private
     procedure LogServer(const A: String);
     procedure LogClient(const A: String);
@@ -92,6 +99,7 @@ begin
   ReportMemoryLeaksOnShutdown := True;
 
   S.AutoFreeObjs := True; //auto free server connections Data property
+  S.EnumeratorOnlyAuth := True;
 
   //--Disable WordWrap because of long text result on slow performance
   S_Memo.WordWrap := False;
@@ -201,15 +209,8 @@ begin
 end;
 
 procedure TFrm.SClientConnect(Sender: TObject; Socket: TDzSocket);
-var C: TClient;
 begin
   LogServer(Format('Socket %d connected', [Socket.ID]));
-
-  C := TClient.Create;
-  Socket.Data := C;
-  C.DNS := Socket.RemoteHost; //slow function
-
-  LCon.Items.AddObject('', Socket);
 end;
 
 procedure TFrm.SClientDisconnect(Sender: TObject; Socket: TDzSocket);
@@ -229,6 +230,46 @@ begin
   LogServer(Format('Socket %d error: %s', [Socket.ID, ErrorMsg]));
 end;
 
+procedure TFrm.SClientLoginCheck(Sender: TObject; Socket: TDzSocket;
+  var Accept: Boolean; const RequestData: string; var ResponseData: string);
+var
+  Sock: TDzSocket;
+  C: TClient;
+begin
+  S.Lock;
+  try
+    for Sock in S do
+    begin
+      C := Sock.Data;
+      if C.Name = RequestData then
+      begin
+        Accept := False;
+        ResponseData := 'User name already in use!';
+        Exit;
+      end;
+    end;
+  finally
+    S.Unlock;
+  end;
+
+  //create client object
+  C := TClient.Create;
+  C.Name := RequestData;
+  Socket.Data := C;
+  C.DNS := Socket.RemoteHost; //slow function
+
+  LCon.Items.AddObject('', Socket);
+end;
+
+procedure TFrm.SClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
+var C: TClient;
+begin
+  C := Socket.Data;
+
+  S.SendAllEx(Socket, 'C', Format('%d/%s', [Socket.ID, C.Name])); //send connection to other clients
+  Socket.Send('L', GetClientsList); //send clients list to the client
+end;
+
 procedure TFrm.SClientRead(Sender: TObject; Socket: TDzSocket; const Cmd: Char;
   const A: string);
 var C: TClient;
@@ -236,14 +277,6 @@ begin
   C := Socket.Data;
 
   case Cmd of
-    'N': //name received on connect
-    begin
-      C.Name := A;
-      LCon.Invalidate;
-
-      S.SendAllEx(Socket, 'C', Format('%d/%s', [Socket.ID, C.Name])); //send connection to other clients
-      Socket.Send('L', GetClientsList); //send clients list to the client
-    end;
     'P': //recebeu screenshot
     begin
       DecodePrint(A);
@@ -360,9 +393,21 @@ begin
   if C.KeepAlive then
     LogClient(Format('KeepAlive enabled [%d ms]', [C.KeepAliveInterval]));
 
-  C.Send('N', EdName.Text); //send name to the server
-
   BtnClientDisconnect.Enabled := True;
+end;
+
+procedure TFrm.CLoginRequest(Sender: TObject; Socket: TDzSocket;
+  var Data: string);
+begin
+  LogClient('Login request');
+  Data := EdName.Text;
+end;
+
+procedure TFrm.CLoginResponse(Sender: TObject; Socket: TDzSocket;
+  Accepted: Boolean; const Data: string);
+begin
+  LogClient(Format('Login response (Accepted: %s / Data: "%s")',
+    [BoolToStr(Accepted, True), Data]))
 end;
 
 procedure TFrm.CConnectionLost(Sender: TObject; Socket: TDzSocket);
