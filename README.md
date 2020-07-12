@@ -19,6 +19,10 @@
 
 ## What's New
 
+- 07/12/2020
+
+   - Increase reading speed by not change string variable multiple times.
+
 - 05/03/2020
 
    - Updated CompInstall to version 1.2
