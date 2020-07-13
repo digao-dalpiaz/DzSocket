@@ -94,7 +94,7 @@ Supports Delphi XE2..Delphi 10.3 Rio
 
 `AutoFreeObjs: Boolean` (public)  = If you are using `Data` property of client sockets on server to assign objects, you may enable this option, so the component will take care of object destruction when client socket ends. Remember, if this option is enabled and the Data property of socket is assigned, the component will presume always Data as object.
 
-`EnumeratorOnlyAuth: Boolean` (public) = When using component enumerator `for in`, by-pass clients non authenticated yet. The same behavior will occur in `SendAll` and `SendAllEx` methods.
+`EnumeratorOnlyAuth: Boolean` (public) = When using component enumerator `for in`, by-pass clients non authenticated yet.
 
 `KeepAlive: Boolean` = Allow enable KeepAlive socket native resource. This will send a keep-alive signal using KeepAliveInterval property.
 
@@ -199,13 +199,13 @@ Sends commands and messages to a client socket specified by `Socket` parameter. 
 procedure SendAll(const Cmd: Char; const A: String = '');
 ```
 
-Send a message to all connected clients.
+Send a message to all authenticated clients.
 
 ```delphi
 procedure SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String = '');
 ```
 
-Send a message to all connected clients, except to the client specified by `Exclude` parameter.
+Send a message to all authenticated clients, except to the client specified by `Exclude` parameter.
 
 ```delphi
 function FindSocketHandle(const ID: TSocket): TDzSocket;
@@ -302,6 +302,8 @@ procedure Send(const Cmd: Char; const A: String = '');
 ```
 
 Sends commands and messages to the server. You should use `Cmd` parameter to specify a command character, that will be received by the server. The `A` parameter is optional and allows you to specify a message text.
+
+> Important: The server won't receive messages while client still not authenticated, even if it is already connected.
 
 ## How to send stream
 

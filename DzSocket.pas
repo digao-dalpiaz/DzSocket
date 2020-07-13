@@ -689,7 +689,7 @@ begin
 
   Lock;
   try
-    for I := 0 to Count-1 do //*cannot use enumerator because auth bypass
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
       if Connection[I].SocketHandle = ID then
       begin
         Result := Connection[I];
@@ -711,13 +711,13 @@ begin
 end;
 
 procedure TDzTCPServer.SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String);
-var Sock: TDzSocket;
+var I: Integer;
 begin
   Lock;
   try
-    for Sock in Self do //*when using EnumeratorOnlyData, bypass clients not auth
-      if Sock<>Exclude then
-        Send(Sock, Cmd, A);
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
+      if (Connection[I]<>Exclude) and Connection[I].Auth then
+        Send(Connection[I], Cmd, A);
   finally
     Unlock;
   end;
@@ -841,7 +841,7 @@ begin
 
   Lock;
   try
-    for I := 0 to Count-1 do //*cannot use enumerator because auth bypass
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
       if Connection[I].Auth then Inc(Qtd);
   finally
     Unlock;
