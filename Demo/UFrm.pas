@@ -160,7 +160,8 @@ begin
 
   U := GetUser(Index);
 
-  LUsers.Canvas.TextOut(3, Rect.Top+2, U.Name);
+  LUsers.Canvas.TextOut(3, Rect.Top+2, U.ID.ToString);
+  LUsers.Canvas.TextOut(50, Rect.Top+2, U.Name);
 end;
 
 procedure TFrm.LogServer(const A: String);

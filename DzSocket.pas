@@ -232,11 +232,15 @@ type
       default DEF_KEEPALIVE_INTERVAL;
   end;
 
+function ArrayToData(const Fields: TArray<Variant>): String;
+function DataToArray(const Data: String): TArray<Variant>;
+
 procedure Register;
 
 implementation
 
-uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections;
+uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections,
+  System.Variants, System.JSON;
 
 procedure Register;
 begin
@@ -244,6 +248,39 @@ begin
 end;
 
 //
+
+{$REGION 'Array Conversion'}
+function ArrayToData(const Fields: TArray<Variant>): String;
+var
+  JA: TJSONArray;
+  F: Variant;
+begin
+  JA := TJSONArray.Create;
+  try
+    for F in Fields do
+      JA.Add(VarToStr(F));
+
+    Result := JA.ToString;
+  finally
+    JA.Free;
+  end;
+end;
+
+function DataToArray(const Data: String): TArray<Variant>;
+var
+  JA: TJSONArray;
+  I: Integer;
+begin
+  JA := TJSONObject.ParseJSONValue(Data) as TJSONArray;
+  try
+    SetLength(Result, JA.Count);
+    for I := 0 to JA.Count-1 do
+      Result[I] := JA.Items[I].Value;
+  finally
+    JA.Free;
+  end;
+end;
+{$ENDREGION}
 
 {$REGION 'KeepAlive - uses WinSock 2'}
 procedure EnableKeepAlive(Socket: TCustomWinSocket; const iTime: Integer);
