@@ -15,11 +15,15 @@
 - [Installing](#installing)
 - [Server Component](#server-component)
 - [Client Component](#client-component)
+- [Array data send](#array-data-send)
 - [How to send stream](#how-to-send-stream)
 
 ## What's New
 
+- 99/99/9999
+
    - New authentication/authorization support!!!
+   - Array data send conversion methods.
    - Removed SendAllOnlyWithData property.
 
 - 07/12/2020
@@ -304,6 +308,37 @@ procedure Send(const Cmd: Char; const A: String = '');
 Sends commands and messages to the server. You should use `Cmd` parameter to specify a command character, that will be received by the server. The `A` parameter is optional and allows you to specify a message text.
 
 > Important: The server won't receive messages while client still not authenticated, even if it is already connected.
+
+## Array data send
+
+When you are using `Send` method from Server or Client socket, there is a `String` parameter allowing you to send data.
+There are two global methods you can use to send multiple data at one time:
+
+```delphi
+function ArrayToData(const Fields: TArray<Variant>): String;
+function DataToArray(const Data: String): TArray<Variant>;
+```
+
+**Sender:**
+```delphi
+var
+  I: Integer;
+  S: String;
+begin
+  DzClientTest.Send('M', ArrayToData([I, S]));
+end;
+```
+
+**Receiver:**
+```delphi
+procedure nnnOnRead(Sender: TObject; Socket: TDzSocket;
+  const Cmd: Char; const A: string);
+var Data: TArray<Variant>;
+begin
+  Data := DataToArray(A);  
+  ShowMessage(Format('Number = %d / String = %s', [Data[0], Data[1]]));
+end;
+```
 
 ## How to send stream
 
