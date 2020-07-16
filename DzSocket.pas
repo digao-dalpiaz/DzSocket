@@ -232,8 +232,9 @@ type
       default DEF_KEEPALIVE_INTERVAL;
   end;
 
-function ArrayToData(const Fields: TArray<Variant>): String;
-function DataToArray(const Data: String): TArray<Variant>;
+type TMsgArray = TArray<Variant>;
+function ArrayToData(const Fields: TMsgArray): String;
+function DataToArray(const Data: String): TMsgArray;
 
 procedure Register;
 
@@ -250,7 +251,7 @@ end;
 //
 
 {$REGION 'Array Conversion'}
-function ArrayToData(const Fields: TArray<Variant>): String;
+function ArrayToData(const Fields: TMsgArray): String;
 var
   JA: TJSONArray;
   F: Variant;
@@ -266,7 +267,7 @@ begin
   end;
 end;
 
-function DataToArray(const Data: String): TArray<Variant>;
+function DataToArray(const Data: String): TMsgArray;
 var
   JA: TJSONArray;
   I: Integer;

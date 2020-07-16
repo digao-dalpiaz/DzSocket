@@ -315,8 +315,9 @@ When you are using `Send` method from Server or Client socket, there is a `Strin
 There are two global methods you can use to send multiple data at one time:
 
 ```delphi
-function ArrayToData(const Fields: TArray<Variant>): String;
-function DataToArray(const Data: String): TArray<Variant>;
+type TMsgArray = TArray<Variant>;
+function ArrayToData(const Fields: TMsgArray): String;
+function DataToArray(const Data: String): TMsgArray;
 ```
 
 **Sender:**
@@ -325,20 +326,22 @@ var
   I: Integer;
   S: String;
 begin
-  DzClientTest.Send('M', ArrayToData([I, S]));
+  DzTCPClientTest.Send('M', ArrayToData([I, S]));
 end;
 ```
 
 **Receiver:**
 ```delphi
-procedure nnnOnRead(Sender: TObject; Socket: TDzSocket;
+procedure DzTCPServerTestClientRead(Sender: TObject; Socket: TDzSocket;
   const Cmd: Char; const A: string);
-var Data: TArray<Variant>;
+var MsgArray: TMsgArray;
 begin
-  Data := DataToArray(A);  
-  ShowMessage(Format('Number = %d / String = %s', [Data[0], Data[1]]));
+  MsgArray := DataToArray(A);  
+  ShowMessage(Format('Number = %d / String = %s', [MsgArray[0], MsgArray[1]]));
 end;
 ```
+
+> The conversion functions internally use JSON to ensure parts characters escape to ensure pack/unpack arrays without change of content. So, you don't need to worry about content of variant type parts.
 
 ## How to send stream
 
