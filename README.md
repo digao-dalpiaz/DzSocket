@@ -15,9 +15,16 @@
 - [Installing](#installing)
 - [Server Component](#server-component)
 - [Client Component](#client-component)
+- [Array data send](#array-data-send)
 - [How to send stream](#how-to-send-stream)
 
 ## What's New
+
+- 07/16/2020
+
+   - New authentication/authorization support!!!
+   - Array data send conversion methods.
+   - Removed SendAllOnlyWithData property.
 
 - 07/12/2020
 
@@ -65,6 +72,8 @@ You can do a lot of stuff, like chat app, remote commands app, remote monitoring
 
 - **Unicode support**: The Delphi native component does not support sending messages using Unicode strings, unless you write your own code to convert data stream on the both sides. This is really boring and takes time. Using DzSocket you can simply send message text using directly method parameter as string type, so Delphi will consider Unicode characters as WideString by default.
 
+- **Login control**: You can control client authentication/authorization by using simple events and you can send extra data information to control client access to the server.
+
 And much more! :wink:
 
 ## Installing
@@ -89,6 +98,8 @@ Supports Delphi XE2..Delphi 10.3 Rio
 
 `AutoFreeObjs: Boolean` (public)  = If you are using `Data` property of client sockets on server to assign objects, you may enable this option, so the component will take care of object destruction when client socket ends. Remember, if this option is enabled and the Data property of socket is assigned, the component will presume always Data as object.
 
+`EnumeratorOnlyAuth: Boolean` (public) = When using component enumerator `for in`, by-pass clients non authenticated yet.
+
 `KeepAlive: Boolean` = Allow enable KeepAlive socket native resource. This will send a keep-alive signal using KeepAliveInterval property.
 
 `KeepAliveInterval: Integer` = Specify the KeepAlive interval in milliseconds (default 15000 / *15 seconds*).
@@ -98,8 +109,6 @@ Supports Delphi XE2..Delphi 10.3 Rio
 `Connection[Index: Integer]: TDzSocket` (public) = Returns the TDzSocket client connection object by Index.
 
 `Count: Integer` (public) = Returns the client connections list count.
-
-`SendAllOnlyWithData: Boolean` (public) = When using `SendAll` or `SendAllEx` methods, if this property is enabled, so the server will send messages only to clients having `Data` property assigned.
 
 ### Server Events
 
@@ -128,6 +137,21 @@ procedure OnClientRead(Sender: TObject; Socket: TDzSocket;
 ```
 
 This event is triggered when a client sends a message to the server. The `Socket` parameter is the client socket.
+
+```delphi
+procedure OnClientLoginCheck(Sender: TObject; Socket: TDzSocket; var Accept: Boolean;
+  const RequestData: String; var ResponseData: String);
+```
+
+This event is triggered when a client has just connected to the server. If at the client side, the `OnLoginRequest` is handled, the data information sent will be receiver here into the `RequestData` parameter.
+You can change the `Accept` parameter (initial default value is True) to accept or reject client connection. Besides that, you can use the `ResponseData` parameter to send to the client some data information. The accepted flag and data information will be receiver by the client at `OnLoginResponse` event.
+If the `Accept` parameter remains True, then socket `Auth` property will be set to True. Otherwise the client connection will be dropped by the server.
+
+```delphi
+procedure OnClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
+```
+
+This event is triggered right after a client is authorized into the server. Even if you are not using login events, remember: only after the client is authorized into the server, then the client can send messages. Otherwise the server will ignore any client messages.
 
 ### Server Methods
 
@@ -179,19 +203,25 @@ Sends commands and messages to a client socket specified by `Socket` parameter. 
 procedure SendAll(const Cmd: Char; const A: String = '');
 ```
 
-Send a message to all connected clients.
+Send a message to all authenticated clients.
 
 ```delphi
 procedure SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String = '');
 ```
 
-Send a message to all connected clients, except to the client specified by `Exclude` parameter.
+Send a message to all authenticated clients, except to the client specified by `Exclude` parameter.
 
 ```delphi
 function FindSocketHandle(const ID: TSocket): TDzSocket;
 ```
 
 Returns the TDzSocket object by Socket Handle ID.
+
+```delphi
+function GetAuthConnections: Integer;
+```
+
+Retrieves only authenticated connections count.
 
 ## Client Component
 
@@ -242,7 +272,20 @@ procedure OnRead(Sender: TObject; Socket: TDzSocket;
   const Cmd: Char; const A: string);
 ```
 
-This event is triggered when the server sends a message to the client.
+This event is triggered when the client receives a message from the server.
+
+```delphi
+procedure OnLoginRequest(Sender: TObject; Socket: TDzSocket; var Data: String);
+```
+
+This event is triggered right after client connects to the server. It means server is requesting login data information, so it can check this data and choose accept or drop the client connection.
+You should fill `Data` parameter if you want to handle this information on the server.
+
+```delphi
+procedure OnLoginResponse(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: String)
+```
+
+This event is triggered when server accepts or rejects the client connection. You can check this result into `Accepted` parameter, and the server may send to the client some data information into `Data` parameter.
 
 ### Client Methods
 
@@ -263,6 +306,42 @@ procedure Send(const Cmd: Char; const A: String = '');
 ```
 
 Sends commands and messages to the server. You should use `Cmd` parameter to specify a command character, that will be received by the server. The `A` parameter is optional and allows you to specify a message text.
+
+> Important: The server won't receive messages while client still not authenticated, even if it is already connected.
+
+## Array data send
+
+When you are using `Send` method from Server or Client socket, there is a `String` parameter allowing you to send data.
+There are two global methods you can use to send multiple data at one time:
+
+```delphi
+type TMsgArray = TArray<Variant>;
+function ArrayToData(const Fields: TMsgArray): String;
+function DataToArray(const Data: String): TMsgArray;
+```
+
+**Sender:**
+```delphi
+var
+  I: Integer;
+  S: String;
+begin
+  DzTCPClientTest.Send('M', ArrayToData([I, S]));
+end;
+```
+
+**Receiver:**
+```delphi
+procedure DzTCPServerTestClientRead(Sender: TObject; Socket: TDzSocket;
+  const Cmd: Char; const A: string);
+var MsgArray: TMsgArray;
+begin
+  MsgArray := DataToArray(A);  
+  ShowMessage(Format('Number = %d / String = %s', [MsgArray[0], MsgArray[1]]));
+end;
+```
+
+> The conversion functions internally use JSON to ensure parts characters escape to ensure pack/unpack arrays without change of content. So, you don't need to worry about content of variant type parts.
 
 ## How to send stream
 

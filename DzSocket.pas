@@ -15,13 +15,13 @@ interface
 {TCP Socket Asynchronous communication / Non-Blocking
 
  The messages uses following syntax:
-   [CHAR_IDENT_MSG][LENGTH][CMD][MSG]
+   [CHAR_IDENT_PART][LENGTH][INTERNALCMD][CMD][MSG]
 
  - The identification character is a security data to confirm the message
    buffer beginning.
 
- - The length is calculated by Cmd+Msg, represented by 4 bytes using an
-   Integer structure stored as AnsiString.
+ - The length is calculated by InternalCmd+Cmd+Msg, represented by 4 bytes
+   using an Integer structure stored as AnsiString.
 
  CACHE:
  When sending long messages or consecutive messages, it may be received by
@@ -63,6 +63,7 @@ type
   private
     Comp: TDzTCPServer;
     Cache: TDzSocketCache;
+    Auth: Boolean; //successful login
   public
     destructor Destroy; override;
   end;
@@ -72,9 +73,11 @@ type
   TDzSocket = class(TCustomWinSocket)
   private
     function GetID: TSocket;
+    function GetAuth: Boolean;
   public
     procedure Send(const Cmd: Char; const A: String = '');
     property ID: TSocket read GetID;
+    property Auth: Boolean read GetAuth; //*only server objects contains this property
   end;
 
   TDzSocketEvent = procedure(Sender: TObject; Socket: TDzSocket) of object;
@@ -82,6 +85,11 @@ type
   TDzSocketErrorEvent = procedure(Sender: TObject; Socket: TDzSocket;
     const Event: TErrorEvent; const ErrorCode: Integer; const ErrorMsg: String) of object;
   TDzSocketDisconnectEvent = procedure(Sender: TObject; Socket: TDzSocket; const WasConnected: Boolean) of object;
+  TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: String) of object;
+  TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: String) of object;
+  TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: String; var ResponseData: String) of object;
+
+  TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: String) of object;
 
   TDzSocketEnumerator = class
   private
@@ -106,6 +114,8 @@ type
     FKeepAlive: Boolean;
     FKeepAliveInterval: Integer;
 
+    FOnLoginRequest: TDzSocketLoginRequestClientEvent;
+    FOnLoginResponse: TDzSocketLoginResponseClientEvent;
     FOnConnect: TDzSocketEvent;
     FOnDisconnect: TDzSocketDisconnectEvent;
     FOnRead: TDzSocketReadEvent;
@@ -124,6 +134,9 @@ type
     function GetSocketHandle: TSocket;
 
     procedure DoEvDisconnect(const WasConnected: Boolean);
+
+    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -143,6 +156,8 @@ type
     property KeepAliveInterval: Integer read FKeepAliveInterval write FKeepAliveInterval
       default DEF_KEEPALIVE_INTERVAL;
 
+    property OnLoginRequest: TDzSocketLoginRequestClientEvent read FOnLoginRequest write FOnLoginRequest;
+    property OnLoginResponse: TDzSocketLoginResponseClientEvent read FOnLoginResponse write FOnLoginResponse;
     property OnConnect: TDzSocketEvent read FOnConnect write FOnConnect;
     property OnDisconnect: TDzSocketDisconnectEvent read FOnDisconnect write FOnDisconnect;
     property OnRead: TDzSocketReadEvent read FOnRead write FOnRead;
@@ -156,6 +171,8 @@ type
 
     FPort: Word;
 
+    FOnClientLoginCheck: TDzSocketLoginServerEvent;
+    FOnClientLoginSuccess: TDzSocketEvent;
     FOnClientConnect: TDzSocketEvent;
     FOnClientDisconnect: TDzSocketEvent;
     FOnClientRead: TDzSocketReadEvent;
@@ -174,9 +191,12 @@ type
 
     function GetConnection(const Index: Integer): TDzSocket;
     function GetCount: Integer;
+
+    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
   public
     AutoFreeObjs: Boolean;
-    SendAllOnlyWithData: Boolean;
+    EnumeratorOnlyAuth: Boolean;
 
     constructor Create(AOwner: TComponent); override;
 
@@ -188,6 +208,7 @@ type
 
     property Connection[const Index: Integer]: TDzSocket read GetConnection;
     property Count: Integer read GetCount;
+    function GetAuthConnections: Integer;
 
     function GetEnumerator: TDzSocketEnumerator;
 
@@ -199,6 +220,8 @@ type
   published
     property Port: Word read FPort write FPort default 0;
 
+    property OnClientLoginCheck: TDzSocketLoginServerEvent read FOnClientLoginCheck write FOnClientLoginCheck;
+    property OnClientLoginSuccess: TDzSocketEvent read FOnClientLoginSuccess write FOnClientLoginSuccess;
     property OnClientConnect: TDzSocketEvent read FOnClientConnect write FOnClientConnect;
     property OnClientDisconnect: TDzSocketEvent read FOnClientDisconnect write FOnClientDisconnect;
     property OnClientRead: TDzSocketReadEvent read FOnClientRead write FOnClientRead;
@@ -209,11 +232,16 @@ type
       default DEF_KEEPALIVE_INTERVAL;
   end;
 
+type TMsgArray = TArray<Variant>;
+function ArrayToData(const Fields: TMsgArray): String;
+function DataToArray(const Data: String): TMsgArray;
+
 procedure Register;
 
 implementation
 
-uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections;
+uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections,
+  System.Variants, System.JSON;
 
 procedure Register;
 begin
@@ -221,6 +249,39 @@ begin
 end;
 
 //
+
+{$REGION 'Array Conversion'}
+function ArrayToData(const Fields: TMsgArray): String;
+var
+  JA: TJSONArray;
+  F: Variant;
+begin
+  JA := TJSONArray.Create;
+  try
+    for F in Fields do
+      JA.Add(VarToStr(F));
+
+    Result := JA.ToString;
+  finally
+    JA.Free;
+  end;
+end;
+
+function DataToArray(const Data: String): TMsgArray;
+var
+  JA: TJSONArray;
+  I: Integer;
+begin
+  JA := TJSONObject.ParseJSONValue(Data) as TJSONArray;
+  try
+    SetLength(Result, JA.Count);
+    for I := 0 to JA.Count-1 do
+      Result[I] := JA.Items[I].Value;
+  finally
+    JA.Free;
+  end;
+end;
+{$ENDREGION}
 
 {$REGION 'KeepAlive - uses WinSock 2'}
 procedure EnableKeepAlive(Socket: TCustomWinSocket; const iTime: Integer);
@@ -281,18 +342,30 @@ begin
   Move(mv_Value[1], Result, STRUCT_MSGSIZE);
 end;
 
-const CHAR_IDENT_MSG = #2;
-procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
-   EvRead: TDzSocketReadEvent; EvError: TDzSocketErrorEvent);
+const
+  CHAR_IDENT_PART = #2;
+  CHAR_CMD_INT_CMD = #5;
+  CHAR_CMD_INT_MSG = #16;
 
-  procedure ReadPart(const A: AnsiString);
+  CHAR_CMD_LOGIN = 'L';
+  CHAR_CMD_ACCEPT = 'A';
+  CHAR_CMD_REJECT = 'R';
+     
+procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
+   EvError: TDzSocketErrorEvent;
+   Cmd_Proc: TDzSocketIntenalProc;
+   Read_Proc: TDzSocketIntenalProc);
+
+  procedure ReadPart(const Msg: AnsiString);
   var
     SU, SA: TStringStream;
     W: String;
+    InternalCmd, Cmd: Char;
+    Data: String;
   begin
     SU := TStringStream.Create(String.Empty, TEncoding.Unicode);
     try
-      SA := TStringStream.Create(A);
+      SA := TStringStream.Create(Msg);
       try
         SU.LoadFromStream(SA); //convert to Unicode
       finally
@@ -304,15 +377,25 @@ procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
       SU.Free;
     end;
 
-    if Assigned(EvRead) then
-      EvRead(Comp, TDzSocket(Socket), W[1], W.Remove(0{0-based}, 1));
+    if W.Length<2 then raise Exception.Create('Socket: Invalid size of message part');
+
+    InternalCmd := W[1];
+    Cmd := W[2];
+    Data := W.Remove(0{0-based}, 2);
+
+    case InternalCmd of
+      CHAR_CMD_INT_CMD: Cmd_Proc(TDzSocket(Socket), Cmd, Data);
+      CHAR_CMD_INT_MSG: Read_Proc(TDzSocket(Socket), Cmd, Data);
+      else raise Exception.Create('Socket: Invalid internal command');
+    end;
   end;
 
 var
   PCache: PSockCache;
   Cache: TDzSocketCache;
-  Buf, A: AnsiString;
+  Buf: AnsiString;
   LMsgs: TList<AnsiString>;
+  Msg: AnsiString;
   X, Len, ReadSize: Integer;
 begin
   Buf := Socket.ReceiveText; //read socket buffer
@@ -344,8 +427,10 @@ begin
             Cache.Data := EmptyAnsiStr;
           end;
         end else
-        if Buf[X]=CHAR_IDENT_MSG then
+        if Buf[X]=CHAR_IDENT_PART then
         begin
+          if X+STRUCT_MSGSIZE > Len then raise Exception.Create('Incomplete prefix');
+
           Cache.Size := StringToSize(Copy(Buf, X+1, STRUCT_MSGSIZE));
           Inc(X, 1+STRUCT_MSGSIZE);
 
@@ -364,22 +449,29 @@ begin
     codes, so its only fired after all buffer receiving is done, avoiding
     messages parts overload.}
 
-    for A in LMsgs do
-      ReadPart(A);
+    for Msg in LMsgs do
+      ReadPart(Msg);
 
   finally
     LMsgs.Free;
   end;
 end;
 
-procedure SockSend(Socket: TCustomWinSocket; const Cmd: Char; const A: String);
+procedure SockSend(Socket: TCustomWinSocket;
+  const Cmd: Char; const A: String; IsInternalCmd: Boolean = False);
 var
-  SU, SA: TStringStream;
+  SU, SA: TStringStream;  
   ansiData: AnsiString;
+  InternalCmd: Char;
 begin
+  if IsInternalCmd then
+    InternalCmd := CHAR_CMD_INT_CMD
+  else
+    InternalCmd := CHAR_CMD_INT_MSG;
+
   SA := TStringStream.Create;
   try
-    SU := TStringStream.Create(Cmd+A, TEncoding.Unicode);
+    SU := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.Unicode);
     try
       SA.LoadFromStream(SU); //convert to Ansi
     finally
@@ -388,9 +480,9 @@ begin
     ansiData := AnsiString(SA.DataString);
   finally
     SA.Free;
-  end;
+  end;   
 
-  Socket.SendText(CHAR_IDENT_MSG+SizeToString(Length(ansiData))+ansiData);
+  Socket.SendText(CHAR_IDENT_PART+SizeToString(Length(ansiData))+ansiData);
 end;
 {$ENDREGION}
 
@@ -398,6 +490,14 @@ end;
 function TDzSocket.GetID: TSocket;
 begin
   Result := SocketHandle;
+end;
+
+function TDzSocket.GetAuth: Boolean;
+begin
+  if not (TObject(Self) is TDzServerClientSocket) then
+    raise Exception.Create('Only clients stored on server contains this property');
+
+  Result := TDzServerClientSocket(Self).Auth;
 end;
 
 procedure TDzSocket.Send(const Cmd: Char; const A: String);
@@ -421,9 +521,17 @@ end;
 
 function TDzSocketEnumerator.MoveNext: Boolean;
 begin
-  Result := FIndex < FComp.Count-1;
-  if Result then
+  while FIndex < FComp.Count-1 do
+  begin
     Inc(FIndex);
+
+    if FComp.EnumeratorOnlyAuth then
+      if not FComp.Connection[FIndex].Auth then Continue;
+
+    Exit(True);
+  end;
+
+  Exit(False);
 end;
 {$ENDREGION}
 
@@ -499,6 +607,7 @@ begin
 end;
 
 procedure TDzTCPClient.int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
+var LoginMsg: String;
 begin
   MonConnectionLost := True; //enable connection lost monitoring
 
@@ -507,6 +616,10 @@ begin
 
   if Assigned(FOnConnect) then
     FOnConnect(Self, TDzSocket(Socket));
+
+  if Assigned(FOnLoginRequest) then
+    FOnLoginRequest(Self, TDzSocket(Socket), LoginMsg);
+  SockSend(Socket, CHAR_CMD_LOGIN, LoginMsg, True);
 end;
 
 procedure TDzTCPClient.int_OnDisconnect(Sender: TObject; Socket: TCustomWinSocket);
@@ -528,7 +641,7 @@ end;
 
 procedure TDzTCPClient.int_OnRead(Sender: TObject; Socket: TCustomWinSocket);
 begin
-  SockRead(Self, Socket, FOnRead, FOnError);
+  SockRead(Self, Socket, FOnError, DoInternalCmd, DoRead);
 end;
 
 procedure TDzTCPClient.int_OnError(Sender: TObject; Socket: TCustomWinSocket;
@@ -550,6 +663,21 @@ begin
     FOnError(Self, TDzSocket(Socket), ErrorEvent, ErrorCode, GetSocketErrorMsg(ErrorCode));
 
     ErrorCode := 0;
+  end;
+end;
+
+procedure TDzTCPClient.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+begin
+  if Assigned(FOnRead) then
+    FOnRead(Self, Socket, Cmd, Data);
+end;
+
+procedure TDzTCPClient.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+begin
+  case Cmd of
+    CHAR_CMD_ACCEPT, CHAR_CMD_REJECT:
+      if Assigned(FOnLoginResponse) then
+        FOnLoginResponse(Self, Socket, Cmd=CHAR_CMD_ACCEPT, Data);
   end;
 end;
 {$ENDREGION}
@@ -593,16 +721,16 @@ begin
 end;
 
 function TDzTCPServer.FindSocketHandle(const ID: TSocket): TDzSocket;
-var Sock: TDzSocket;
+var I: Integer;
 begin
   Result := nil;
 
   Lock;
   try
-    for Sock in Self do
-      if Sock.SocketHandle = ID then
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
+      if Connection[I].SocketHandle = ID then
       begin
-        Result := Sock;
+        Result := Connection[I];
         Break;
       end;
   finally
@@ -621,19 +749,13 @@ begin
 end;
 
 procedure TDzTCPServer.SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String);
-var Sock: TDzSocket;
+var I: Integer;
 begin
   Lock;
   try
-    for Sock in Self do
-    begin
-      if Sock=Exclude then Continue;
-
-      if SendAllOnlyWithData then
-        if Sock.Data=nil then Continue;
-
-      Send(Sock, Cmd, A);
-    end;
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
+      if (Connection[I]<>Exclude) and Connection[I].Auth then
+        Send(Connection[I], Cmd, A);
   finally
     Unlock;
   end;
@@ -674,7 +796,7 @@ end;
 
 procedure TDzTCPServer.int_OnClientRead(Sender: TObject; Socket: TCustomWinSocket);
 begin
-  SockRead(Self, Socket, FOnClientRead, FOnClientError);
+  SockRead(Self, Socket, FOnClientError, DoInternalCmd, DoRead);
 end;
 
 procedure TDzTCPServer.int_OnClientError(Sender: TObject; Socket: TCustomWinSocket;
@@ -688,6 +810,46 @@ begin
   end;
 
   if ErrorEvent=eeDisconnect then Socket.Close; //this error caused disconnection
+end;
+
+procedure TDzTCPServer.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+begin
+  if not Socket.Auth then Exit;
+
+  if Assigned(FOnClientRead) then
+    FOnClientRead(Self, Socket, Cmd, Data);
+end;
+
+procedure TDzTCPServer.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+var
+  Accept: Boolean;
+  ResponseData: String;
+  ResponseCmd: Char;
+begin
+  case Cmd of
+    CHAR_CMD_LOGIN:
+      begin
+        Accept := True;
+        if Assigned(FOnClientLoginCheck) then
+          FOnClientLoginCheck(Self, Socket, Accept, Data, ResponseData);
+
+        if Accept then
+          TDzServerClientSocket(Socket).Auth := True;
+
+        if Accept then
+          ResponseCmd := CHAR_CMD_ACCEPT
+        else
+          ResponseCmd := CHAR_CMD_REJECT;
+
+        SockSend(Socket, ResponseCmd, ResponseData, True);
+        if Accept then
+        begin
+          if Assigned(FOnClientLoginSuccess) then
+            FOnClientLoginSuccess(Self, Socket);
+        end
+          else Socket.Close; //drop the client
+      end;
+  end;
 end;
 
 procedure TDzTCPServer.Lock;
@@ -708,6 +870,22 @@ end;
 function TDzTCPServer.GetCount: Integer;
 begin
   Result := S.Socket.ActiveConnections;
+end;
+
+function TDzTCPServer.GetAuthConnections: Integer;
+var I, Qtd: Integer;
+begin
+  Qtd := 0;
+
+  Lock;
+  try
+    for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
+      if Connection[I].Auth then Inc(Qtd);
+  finally
+    Unlock;
+  end;
+
+  Result := Qtd;
 end;
 
 function TDzTCPServer.GetEnumerator: TDzSocketEnumerator;

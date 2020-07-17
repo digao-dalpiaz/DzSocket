@@ -645,6 +645,8 @@ object Frm: TFrm
   end
   object C: TDzTCPClient
     KeepAlive = True
+    OnLoginRequest = CLoginRequest
+    OnLoginResponse = CLoginResponse
     OnConnect = CConnect
     OnDisconnect = CDisconnect
     OnRead = CRead
@@ -654,6 +656,8 @@ object Frm: TFrm
     Top = 232
   end
   object S: TDzTCPServer
+    OnClientLoginCheck = SClientLoginCheck
+    OnClientLoginSuccess = SClientLoginSuccess
     OnClientConnect = SClientConnect
     OnClientDisconnect = SClientDisconnect
     OnClientRead = SClientRead
