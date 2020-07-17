@@ -20,7 +20,7 @@
 
 ## What's New
 
-- 99/99/9999
+- 07/16/2020
 
    - New authentication/authorization support!!!
    - Array data send conversion methods.
