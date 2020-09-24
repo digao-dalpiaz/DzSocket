@@ -272,6 +272,9 @@ var
   JA: TJSONArray;
   I: Integer;
 begin
+  if Data.IsEmpty then
+    raise Exception.Create('Cannot convert empty string to message array');
+
   JA := TJSONObject.ParseJSONValue(Data) as TJSONArray;
   try
     SetLength(Result, JA.Count);
