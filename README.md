@@ -20,6 +20,10 @@
 
 ## What's New
 
+- 09/24/2020
+
+   - Included empty string validation on DataToArray to avoid JSON conversion error.
+
 - 07/16/2020
 
    - New authentication/authorization support!!!
