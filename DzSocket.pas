@@ -63,6 +63,7 @@ type
   private
     Comp: TDzTCPServer;
     Cache: TDzSocketCache;
+    Disconnected: Boolean;
     Auth: Boolean; //successful login
   public
     destructor Destroy; override;
@@ -743,6 +744,9 @@ end;
 
 procedure TDzTCPServer.Send(Socket: TDzSocket; const Cmd: Char; const A: String);
 begin
+  //if TDzServerClientSocket(Socket).Disconnected then
+  //  raise Exception.Create('Cannot send to this socket because it has already disconnected');
+
   SockSend(Socket, Cmd, A);
 end;
 
@@ -757,7 +761,8 @@ begin
   Lock;
   try
     for I := 0 to Count-1 do //*cannot use enumerator because dynamic auth bypass
-      if (Connection[I]<>Exclude) and Connection[I].Auth then
+      if (Connection[I]<>Exclude) and Connection[I].Auth and
+        not TDzServerClientSocket(Connection[I]).Disconnected then
         Send(Connection[I], Cmd, A);
   finally
     Unlock;
@@ -793,6 +798,8 @@ end;
 
 procedure TDzTCPServer.int_OnClientDisconnect(Sender: TObject; Socket: TCustomWinSocket);
 begin
+  TDzServerClientSocket(Socket).Disconnected := True;
+
   if Assigned(FOnClientDisconnect) then
     FOnClientDisconnect(Self, TDzSocket(Socket));
 end;
