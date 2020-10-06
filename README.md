@@ -20,6 +20,10 @@
 
 ## What's New
 
+- 10/06/2020
+
+   - Implemented treatment to disregard client connection in SendAll / SendAllEx methods from the moment of their disconnection event.
+
 - 09/24/2020
 
    - Included empty string validation on DataToArray to avoid JSON conversion error.
