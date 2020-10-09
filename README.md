@@ -20,6 +20,10 @@
 
 ## What's New
 
+- 10/09/2020
+
+   - Changed disregard treatment to occur in Send method instead SendAll / SendAllEx (internally call Send method anyway).
+
 - 10/06/2020
 
    - Implemented treatment to disregard client connection in SendAll / SendAllEx methods from the moment of their disconnection event.
