@@ -20,6 +20,10 @@
 
 ## What's New
 
+- 10/26/2020 (Version 2.1)
+
+   - Updated CompInstall to version 2.0 (now supports GitHub auto-update)
+
 - 10/09/2020
 
    - Changed disregard treatment to occur in Send method instead SendAll / SendAllEx (internally call Send method anyway).
