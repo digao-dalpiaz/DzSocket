@@ -109,6 +109,8 @@ type
 
     Cache: TDzSocketCache;
 
+    FAbout: String;
+
     FPort: Word;
     FHost: String;
 
@@ -150,6 +152,8 @@ type
     property Connected: Boolean read GetConnected;
     property SocketHandle: TSocket read GetSocketHandle;
   published
+    property About: String read FAbout;
+
     property Port: Word read FPort write FPort default 0;
     property Host: String read FHost write FHost;
 
@@ -169,6 +173,8 @@ type
   TDzTCPServer = class(TComponent)
   private
     S: TServerSocket;
+
+    FAbout: String;
 
     FPort: Word;
 
@@ -219,6 +225,8 @@ type
 
     function FindSocketHandle(const ID: TSocket): TDzSocket;
   published
+    property About: String read FAbout;
+
     property Port: Word read FPort write FPort default 0;
 
     property OnClientLoginCheck: TDzSocketLoginServerEvent read FOnClientLoginCheck write FOnClientLoginCheck;
@@ -243,6 +251,8 @@ implementation
 
 uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections,
   System.Variants, System.JSON;
+
+const STR_ABOUT = 'Digao Dalpiaz / Version 2.1';
 
 procedure Register;
 begin
@@ -543,6 +553,7 @@ end;
 constructor TDzTCPClient.Create(AOwner: TComponent);
 begin
   inherited;
+  FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
 end;
 
@@ -690,6 +701,7 @@ end;
 constructor TDzTCPServer.Create(AOwner: TComponent);
 begin
   inherited;
+  FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
 
   S := TServerSocket.Create(Self);
