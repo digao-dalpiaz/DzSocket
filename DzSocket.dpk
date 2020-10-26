@@ -26,7 +26,7 @@ package DzSocket;
 {$IMAGEBASE $400000}
 {$DEFINE RELEASE}
 {$ENDIF IMPLICITBUILDING}
-{$DESCRIPTION 'Digao Dalpiaz - TCP Socket communication'}
+{$DESCRIPTION 'Digao Dalpiaz - DzSocket component'}
 {$IMPLICITBUILD ON}
 
 requires
