@@ -241,18 +241,22 @@ type
       default DEF_KEEPALIVE_INTERVAL;
   end;
 
+{$IF CompilerVersion >= 26}{$DEFINE USE_JSON}{$IFEND} //XE6 or higher
+{$IFDEF USE_JSON}
 type TMsgArray = TArray<Variant>;
 function ArrayToData(const Fields: TMsgArray): String;
 function DataToArray(const Data: String): TMsgArray;
+{$ENDIF}
 
 procedure Register;
 
 implementation
 
-uses System.SysUtils, Winapi.Winsock2, System.Generics.Collections,
-  System.Variants, System.JSON;
+uses System.SysUtils, System.Variants,
+  Winapi.Winsock2, System.Generics.Collections  
+  {$IFDEF USE_JSON}, System.JSON{$ENDIF};
 
-const STR_ABOUT = 'Digao Dalpiaz / Version 2.1';
+const STR_ABOUT = 'Digao Dalpiaz / Version 2.2';
 
 procedure Register;
 begin
@@ -262,6 +266,7 @@ end;
 //
 
 {$REGION 'Array Conversion'}
+{$IFDEF USE_JSON}
 function ArrayToData(const Fields: TMsgArray): String;
 var
   JA: TJSONArray;
@@ -295,6 +300,7 @@ begin
     JA.Free;
   end;
 end;
+{$ENDIF}
 {$ENDREGION}
 
 {$REGION 'KeepAlive - uses WinSock 2'}

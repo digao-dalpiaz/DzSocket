@@ -20,6 +20,11 @@
 
 ## What's New
 
+- 10/27/2020 (Version 2.2)
+
+   - Fixed previous Delphi versions (at least on XE2, XE3, XE4 and XE5) package tag. It was causing package compilation error.
+   - Fixed to use JSON unit only when Delphi XE6 or higher.
+
 - 10/26/2020 (Version 2.1)
 
    - Updated CompInstall to version 2.0 (now supports GitHub auto-update)
@@ -78,7 +83,7 @@ You can do a lot of stuff, like chat app, remote commands app, remote monitoring
 
 - **Commands**: The native socket allows you to send string segment, but if you want to send commands and identify this commands in the other side of the connection, you will need to manually implement this. With DzSocket, you have a Char command always available. Ready, fast and easy.
 
-- **Auto Free Data Objects on Server**: The Client object list available on Server component has a Pointer property, allowing you to store informations about the client connection, usually using a object. With DzSocket, you don't need to worry about this object destruction. You just need to enable a property to take care of these objects.
+- **Auto Free Data Objects on Server**: The Client object list available on Server component has a Pointer property, allowing you to store information about the client connection, usually using a object. With DzSocket, you don't need to worry about this object destruction. You just need to enable a property to take care of these objects.
 
 - **Enumerator**: The native Server component does not have a enumerator to iterate Client List connections. Using DzSocket, you can simply do a `for .. in` directly on Server component, iterating client list connections.
 
@@ -326,6 +331,8 @@ Sends commands and messages to the server. You should use `Cmd` parameter to spe
 > Important: The server won't receive messages while client still not authenticated, even if it is already connected.
 
 ## Array data send
+
+**Only available on Delphi XE6 or higher**
 
 When you are using `Send` method from Server or Client socket, there is a `String` parameter allowing you to send data.
 There are two global methods you can use to send multiple data at one time:
