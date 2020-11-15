@@ -73,14 +73,14 @@ type
       var Accept: Boolean; const RequestData: string; var ResponseData: string);
     procedure SClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
   private
-    procedure LogServer(const A: String);
-    procedure LogClient(const A: String);
+    procedure LogServer(const A: string);
+    procedure LogClient(const A: string);
 
     procedure DoSound;
-    function GetClientsList: String;
-    procedure ClientsListReceived(const A: String);
-    procedure AddUser(const A: String);
-    procedure DelUser(const A: String);
+    function GetClientsList: string;
+    procedure ClientsListReceived(const A: string);
+    procedure AddUser(const A: string);
+    procedure DelUser(const A: string);
     procedure ClearClientUsers;
   end;
 
@@ -164,12 +164,12 @@ begin
   LUsers.Canvas.TextOut(50, Rect.Top+2, U.Name);
 end;
 
-procedure TFrm.LogServer(const A: String);
+procedure TFrm.LogServer(const A: string);
 begin
   S_Memo.Lines.Add(FormatDateTime('hh:nn:ss', Now)+' '+A);
 end;
 
-procedure TFrm.LogClient(const A: String);
+procedure TFrm.LogClient(const A: string);
 begin
   C_Memo.Lines.Add(FormatDateTime('hh:nn:ss', Now)+' '+A);
 end;
@@ -295,7 +295,7 @@ end;
 procedure TFrm.S_MsgKeyPress(Sender: TObject; var Key: Char);
 var
   Cmd: Char;
-  Msg: String;
+  Msg: string;
   Sock: TDzSocket;
   C: TClient;
 begin
@@ -323,7 +323,7 @@ end;
 procedure TFrm.BtnSendAllClick(Sender: TObject);
 var
   Cmd: Char;
-  Msg: String;
+  Msg: string;
 begin
   Cmd := S_Cmd.Text[1];
   Msg := S_Msg.Text;
@@ -343,7 +343,7 @@ begin
   Sock.Close;
 end;
 
-function TFrm.GetClientsList: String;
+function TFrm.GetClientsList: string;
 var
   Lst: TStringList;
   Sock: TDzSocket;
@@ -457,7 +457,7 @@ end;
 procedure TFrm.C_MsgKeyPress(Sender: TObject; var Key: Char);
 var
   Cmd: Char;
-  Msg: String;
+  Msg: string;
 begin
   if Key = #13 then
   begin
@@ -472,10 +472,10 @@ begin
   end;
 end;
 
-procedure TFrm.ClientsListReceived(const A: String);
+procedure TFrm.ClientsListReceived(const A: string);
 var
   Lst: TStringList;
-  Line: String;
+  Line: string;
 begin
   Lst := TStringList.Create;
   try
@@ -487,10 +487,10 @@ begin
   end;
 end;
 
-procedure TFrm.AddUser(const A: String);
+procedure TFrm.AddUser(const A: string);
 var
   U: TUser;
-  Parts: TArray<String>;
+  Parts: TArray<string>;
 begin
   Parts := A.Split(['/']);
 
@@ -500,7 +500,7 @@ begin
   LUsers.Items.AddObject('', U);
 end;
 
-procedure TFrm.DelUser(const A: String);
+procedure TFrm.DelUser(const A: string);
 var I: Integer;
 begin
   I := FindUser(StrToInt(A));

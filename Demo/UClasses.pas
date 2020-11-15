@@ -7,13 +7,13 @@ uses DzSocket;
 type
   //Class for list of clients in Server
   TClient = class
-    Name, DNS: String;
+    Name, DNS: string;
   end;
 
   //Class for list of clients in Client
   TUser = class
     ID: TSocket;
-    Name: String;
+    Name: string;
   end;
 
 function GetSelSocketInServer: TDzSocket;

@@ -3,7 +3,7 @@ unit UPrint;
 interface
 
 procedure SendPrint;
-procedure DecodePrint(const A: String);
+procedure DecodePrint(const A: string);
 
 implementation
 
@@ -52,7 +52,7 @@ begin
   end;
 end;
 
-procedure DecodePrint(const A: String);
+procedure DecodePrint(const A: string);
 var
   MS: TStringStream;
   Mem: TMemoryStream;

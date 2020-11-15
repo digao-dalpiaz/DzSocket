@@ -76,21 +76,21 @@ type
     function GetID: TSocket;
     function GetAuth: Boolean;
   public
-    procedure Send(const Cmd: Char; const A: String = '');
+    procedure Send(const Cmd: Char; const A: string = '');
     property ID: TSocket read GetID;
     property Auth: Boolean read GetAuth; //*only server objects contains this property
   end;
 
   TDzSocketEvent = procedure(Sender: TObject; Socket: TDzSocket) of object;
-  TDzSocketReadEvent = procedure(Sender: TObject; Socket: TDzSocket; const Cmd: Char; const A: String) of object;
+  TDzSocketReadEvent = procedure(Sender: TObject; Socket: TDzSocket; const Cmd: Char; const A: string) of object;
   TDzSocketErrorEvent = procedure(Sender: TObject; Socket: TDzSocket;
-    const Event: TErrorEvent; const ErrorCode: Integer; const ErrorMsg: String) of object;
+    const Event: TErrorEvent; const ErrorCode: Integer; const ErrorMsg: string) of object;
   TDzSocketDisconnectEvent = procedure(Sender: TObject; Socket: TDzSocket; const WasConnected: Boolean) of object;
-  TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: String) of object;
-  TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: String) of object;
-  TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: String; var ResponseData: String) of object;
+  TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: string) of object;
+  TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: string) of object;
+  TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: string; var ResponseData: string) of object;
 
-  TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: String) of object;
+  TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: string) of object;
 
   TDzSocketEnumerator = class
   private
@@ -109,10 +109,10 @@ type
 
     Cache: TDzSocketCache;
 
-    FAbout: String;
+    FAbout: string;
 
     FPort: Word;
-    FHost: String;
+    FHost: string;
 
     FKeepAlive: Boolean;
     FKeepAliveInterval: Integer;
@@ -138,8 +138,8 @@ type
 
     procedure DoEvDisconnect(const WasConnected: Boolean);
 
-    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
-    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
+    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -147,15 +147,15 @@ type
     procedure Connect;
     procedure Disconnect;
 
-    procedure Send(const Cmd: Char; const A: String = '');
+    procedure Send(const Cmd: Char; const A: string = '');
 
     property Connected: Boolean read GetConnected;
     property SocketHandle: TSocket read GetSocketHandle;
   published
-    property About: String read FAbout;
+    property About: string read FAbout;
 
     property Port: Word read FPort write FPort default 0;
-    property Host: String read FHost write FHost;
+    property Host: string read FHost write FHost;
 
     property KeepAlive: Boolean read FKeepAlive write FKeepAlive default False;
     property KeepAliveInterval: Integer read FKeepAliveInterval write FKeepAliveInterval
@@ -174,7 +174,7 @@ type
   private
     S: TServerSocket;
 
-    FAbout: String;
+    FAbout: string;
 
     FPort: Word;
 
@@ -199,8 +199,8 @@ type
     function GetConnection(const Index: Integer): TDzSocket;
     function GetCount: Integer;
 
-    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
-    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+    procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
+    procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
   public
     AutoFreeObjs: Boolean;
     EnumeratorOnlyAuth: Boolean;
@@ -219,13 +219,13 @@ type
 
     function GetEnumerator: TDzSocketEnumerator;
 
-    procedure Send(Socket: TDzSocket; const Cmd: Char; const A: String = '');
-    procedure SendAll(const Cmd: Char; const A: String = '');
-    procedure SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String = '');
+    procedure Send(Socket: TDzSocket; const Cmd: Char; const A: string = '');
+    procedure SendAll(const Cmd: Char; const A: string = '');
+    procedure SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: string = '');
 
     function FindSocketHandle(const ID: TSocket): TDzSocket;
   published
-    property About: String read FAbout;
+    property About: string read FAbout;
 
     property Port: Word read FPort write FPort default 0;
 
@@ -244,8 +244,8 @@ type
 {$IF CompilerVersion >= 26}{$DEFINE USE_JSON}{$IFEND} //XE6 or higher
 {$IFDEF USE_JSON}
 type TMsgArray = TArray<Variant>;
-function ArrayToData(const Fields: TMsgArray): String;
-function DataToArray(const Data: String): TMsgArray;
+function ArrayToData(const Fields: TMsgArray): string;
+function DataToArray(const Data: string): TMsgArray;
 {$ENDIF}
 
 procedure Register;
@@ -268,7 +268,7 @@ end;
 
 {$REGION 'Array Conversion'}
 {$IFDEF USE_JSON}
-function ArrayToData(const Fields: TMsgArray): String;
+function ArrayToData(const Fields: TMsgArray): string;
 var
   JA: TJSONArray;
   F: Variant;
@@ -284,7 +284,7 @@ begin
   end;
 end;
 
-function DataToArray(const Data: String): TMsgArray;
+function DataToArray(const Data: string): TMsgArray;
 var
   JA: TJSONArray;
   I: Integer;
@@ -328,7 +328,7 @@ end;
 {$ENDREGION}
 
 {$REGION 'Error Handling'}
-function GetSocketErrorMsg(const Cod: Integer): String;
+function GetSocketErrorMsg(const Cod: Integer): string;
 begin
   Result := SysErrorMessage(Cod);
 end;
@@ -380,11 +380,11 @@ procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
   procedure ReadPart(const Msg: AnsiString);
   var
     SU, SA: TStringStream;
-    W: String;
+    W: string;
     InternalCmd, Cmd: Char;
-    Data: String;
+    Data: string;
   begin
-    SU := TStringStream.Create(String.Empty, TEncoding.Unicode);
+    SU := TStringStream.Create(string.Empty, TEncoding.Unicode);
     try
       SA := TStringStream.Create(Msg);
       try
@@ -479,7 +479,7 @@ begin
 end;
 
 procedure SockSend(Socket: TCustomWinSocket;
-  const Cmd: Char; const A: String; IsInternalCmd: Boolean = False);
+  const Cmd: Char; const A: string; IsInternalCmd: Boolean = False);
 var
   SU, SA: TStringStream;  
   ansiData: AnsiString;
@@ -521,7 +521,7 @@ begin
   Result := TDzServerClientSocket(Self).Auth;
 end;
 
-procedure TDzSocket.Send(const Cmd: Char; const A: String);
+procedure TDzSocket.Send(const Cmd: Char; const A: string);
 begin
   SockSend(Self, Cmd, A);
 end;
@@ -575,7 +575,7 @@ procedure TDzTCPClient.Connect;
 begin
   if Connected then Exit;
 
-  if FHost=String.Empty then
+  if FHost=string.Empty then
     raise Exception.Create('Host not specified');
   if FPort=0 then
     raise Exception.Create('Port not specified');
@@ -620,7 +620,7 @@ begin
     Result := Winapi.WinSock.INVALID_SOCKET;
 end;
 
-procedure TDzTCPClient.Send(const Cmd: Char; const A: String);
+procedure TDzTCPClient.Send(const Cmd: Char; const A: string);
 begin
   if not Connected then
     raise Exception.Create('Socket is not connected to send');
@@ -629,7 +629,7 @@ begin
 end;
 
 procedure TDzTCPClient.int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
-var LoginMsg: String;
+var LoginMsg: string;
 begin
   MonConnectionLost := True; //enable connection lost monitoring
 
@@ -688,13 +688,13 @@ begin
   end;
 end;
 
-procedure TDzTCPClient.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+procedure TDzTCPClient.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
 begin
   if Assigned(FOnRead) then
     FOnRead(Self, Socket, Cmd, Data);
 end;
 
-procedure TDzTCPClient.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+procedure TDzTCPClient.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
 begin
   case Cmd of
     CHAR_CMD_ACCEPT, CHAR_CMD_REJECT:
@@ -761,19 +761,19 @@ begin
   end;
 end;
 
-procedure TDzTCPServer.Send(Socket: TDzSocket; const Cmd: Char; const A: String);
+procedure TDzTCPServer.Send(Socket: TDzSocket; const Cmd: Char; const A: string);
 begin
   if TDzServerClientSocket(Socket).Disconnected then Exit;
 
   SockSend(Socket, Cmd, A);
 end;
 
-procedure TDzTCPServer.SendAll(const Cmd: Char; const A: String);
+procedure TDzTCPServer.SendAll(const Cmd: Char; const A: string);
 begin
   SendAllEx(nil, Cmd, A);
 end;
 
-procedure TDzTCPServer.SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: String);
+procedure TDzTCPServer.SendAllEx(Exclude: TDzSocket; const Cmd: Char; const A: string);
 var I: Integer;
 begin
   Lock;
@@ -839,7 +839,7 @@ begin
   if ErrorEvent=eeDisconnect then Socket.Close; //this error caused disconnection
 end;
 
-procedure TDzTCPServer.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: String);
+procedure TDzTCPServer.DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
 begin
   if not Socket.Auth then Exit;
 
@@ -847,10 +847,10 @@ begin
     FOnClientRead(Self, Socket, Cmd, Data);
 end;
 
-procedure TDzTCPServer.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: String);
+procedure TDzTCPServer.DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
 var
   Accept: Boolean;
-  ResponseData: String;
+  ResponseData: string;
   ResponseCmd: Char;
 begin
   case Cmd of
