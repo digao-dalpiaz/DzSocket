@@ -20,6 +20,10 @@
 
 ## What's New
 
+- 11/28/2020
+
+   - Included new FMX chat demo application.
+
 - 10/31/2020 (Version 2.3)
 
    - Included Delphi 10.4 auto-install support.
