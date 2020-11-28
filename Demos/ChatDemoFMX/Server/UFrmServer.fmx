@@ -1,0 +1,83 @@
+object FrmServer: TFrmServer
+  Left = 0
+  Top = 0
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = Single
+  Caption = 'DzSocket Chat Demo - Server'
+  ClientHeight = 433
+  ClientWidth = 495
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  DesignerMasterStyle = 0
+  object L: TListBox
+    Position.X = 16.000000000000000000
+    Position.Y = 32.000000000000000000
+    Size.Width = 369.000000000000000000
+    Size.Height = 225.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    DisableFocusEffect = True
+    DefaultItemStyles.ItemStyle = ''
+    DefaultItemStyles.GroupHeaderStyle = ''
+    DefaultItemStyles.GroupFooterStyle = ''
+    Viewport.Width = 365.000000000000000000
+    Viewport.Height = 221.000000000000000000
+  end
+  object LbClientsList: TLabel
+    AutoSize = True
+    Position.X = 16.000000000000000000
+    Position.Y = 16.000000000000000000
+    Size.Width = 120.000000000000000000
+    Size.Height = 16.000000000000000000
+    Size.PlatformDefault = False
+    Text = 'Connected clients:'
+    TabOrder = 0
+  end
+  object BtnKill: TButton
+    Position.X = 400.000000000000000000
+    Position.Y = 32.000000000000000000
+    Size.Width = 80.000000000000000000
+    Size.Height = 25.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = 'Kill Client'
+    OnClick = BtnKillClick
+  end
+  object EdLog: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    ReadOnly = True
+    TextSettings.WordWrap = True
+    Position.X = 16.000000000000000000
+    Position.Y = 288.000000000000000000
+    Size.Width = 465.000000000000000000
+    Size.Height = 129.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 4
+    Viewport.Width = 461.000000000000000000
+    Viewport.Height = 125.000000000000000000
+  end
+  object LbLogs: TLabel
+    AutoSize = True
+    Position.X = 16.000000000000000000
+    Position.Y = 272.000000000000000000
+    Size.Width = 120.000000000000000000
+    Size.Height = 16.000000000000000000
+    Size.PlatformDefault = False
+    Text = 'Logs:'
+    TabOrder = 3
+  end
+  object S: TDzTCPServer
+    Port = 6633
+    OnClientLoginCheck = SClientLoginCheck
+    OnClientLoginSuccess = SClientLoginSuccess
+    OnClientDisconnect = SClientDisconnect
+    OnClientRead = SClientRead
+    OnClientError = SClientError
+    KeepAlive = True
+    Left = 280
+    Top = 144
+  end
+end

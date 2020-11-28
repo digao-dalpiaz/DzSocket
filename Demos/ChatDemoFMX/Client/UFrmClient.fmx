@@ -1,0 +1,110 @@
+object FrmClient: TFrmClient
+  Left = 0
+  Top = 0
+  BorderIcons = [biSystemMenu, biMinimize]
+  BorderStyle = Single
+  Caption = 'DzSocket Chat Demo - Client'
+  ClientHeight = 358
+  ClientWidth = 544
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnCreate = FormCreate
+  DesignerMasterStyle = 0
+  object EdLog: TMemo
+    Touch.InteractiveGestures = [Pan, LongTap, DoubleTap]
+    DataDetectorTypes = []
+    ReadOnly = True
+    TextSettings.WordWrap = True
+    Position.X = 8.000000000000000000
+    Position.Y = 72.000000000000000000
+    Size.Width = 529.000000000000000000
+    Size.Height = 249.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 3
+    TabStop = False
+    Viewport.Width = 525.000000000000000000
+    Viewport.Height = 245.000000000000000000
+  end
+  object EdMessage: TEdit
+    Touch.InteractiveGestures = [LongTap, DoubleTap]
+    TabOrder = 4
+    Position.X = 8.000000000000000000
+    Position.Y = 328.000000000000000000
+    Size.Width = 529.000000000000000000
+    Size.Height = 22.000000000000000000
+    Size.PlatformDefault = False
+    OnKeyDown = EdMessageKeyDown
+  end
+  object BtnConnect: TButton
+    Position.X = 456.000000000000000000
+    Position.Y = 8.000000000000000000
+    Size.Width = 80.000000000000000000
+    Size.Height = 25.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    Text = 'Connect'
+    OnClick = BtnConnectClick
+  end
+  object BtnDisconnect: TButton
+    Position.X = 456.000000000000000000
+    Position.Y = 40.000000000000000000
+    Size.Width = 80.000000000000000000
+    Size.Height = 25.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    Text = 'Disconnect'
+    OnClick = BtnDisconnectClick
+  end
+  object BoxConfig: TPanel
+    Position.X = 8.000000000000000000
+    Position.Y = 8.000000000000000000
+    Size.Width = 441.000000000000000000
+    Size.Height = 57.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object EdNickName: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      TabOrder = 1
+      Position.X = 8.000000000000000000
+      Position.Y = 24.000000000000000000
+      Size.Width = 209.000000000000000000
+      Size.Height = 22.000000000000000000
+      Size.PlatformDefault = False
+    end
+    object LbNickName: TLabel
+      Position.X = 8.000000000000000000
+      Position.Y = 8.000000000000000000
+      Text = 'Nick name'
+      TabOrder = 0
+    end
+    object EdHost: TEdit
+      Touch.InteractiveGestures = [LongTap, DoubleTap]
+      TabOrder = 3
+      Text = 'localhost'
+      Position.X = 224.000000000000000000
+      Position.Y = 24.000000000000000000
+      Size.Width = 209.000000000000000000
+      Size.Height = 22.000000000000000000
+      Size.PlatformDefault = False
+    end
+    object LbHost: TLabel
+      Position.X = 224.000000000000000000
+      Position.Y = 8.000000000000000000
+      Text = 'Server address:'
+      TabOrder = 2
+    end
+  end
+  object C: TDzTCPClient
+    Port = 6633
+    KeepAlive = True
+    OnLoginRequest = CLoginRequest
+    OnLoginResponse = CLoginResponse
+    OnDisconnect = CDisconnect
+    OnRead = CRead
+    OnError = CError
+    OnConnectionLost = CConnectionLost
+    Left = 176
+    Top = 88
+  end
+end
