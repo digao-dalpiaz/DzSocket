@@ -256,7 +256,7 @@ uses System.SysUtils, System.Variants,
   Winapi.Winsock2, System.Generics.Collections  
   {$IFDEF USE_JSON}, System.JSON{$ENDIF};
 
-const STR_VERSION = '2.3';
+const STR_VERSION = '2.4';
 const STR_ABOUT = 'Digao Dalpiaz / Version '+STR_VERSION;
 
 procedure Register;

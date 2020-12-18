@@ -21,6 +21,10 @@
 
 ## What's New
 
+- 12/18/2020 (Version 2.4)
+
+   - Updated Component Installer app (Fixed call to rsvars.bat when Delphi is installed in a path containing spaces characters).
+
 - 11/28/2020
 
    - Included new FMX chat demo application.
