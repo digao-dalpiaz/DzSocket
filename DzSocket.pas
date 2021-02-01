@@ -241,7 +241,7 @@ type
       default DEF_KEEPALIVE_INTERVAL;
   end;
 
-{$IF CompilerVersion >= 27}{$DEFINE USE_JSON}{$IFEND} //XE6 or higher
+{$IF CompilerVersion >= 27}{$DEFINE USE_JSON}{$ENDIF} //XE6 or higher
 {$IFDEF USE_JSON}
 type TMsgArray = TArray<Variant>;
 function ArrayToData(const Fields: TMsgArray): string;
