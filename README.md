@@ -8,6 +8,8 @@
 ![VCL and FMX](https://img.shields.io/badge/-VCL%20and%20FMX-lightgrey.svg)
 ![Unicode support](https://img.shields.io/badge/-Unicode%20messages%20support-green.svg)
 
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/C0C53LVFN)
+
 ![Demo Example](images/demo_example.png)
 
 - [What's New](#whats-new)
