@@ -694,22 +694,19 @@ begin
   begin
     if Assigned(FOnConnectionLost) then
       FOnConnectionLost(Self, TDzSocket(C.Socket));
+
+    if FAutoReconnect then
+      ReconnectionChallenge := True;
   end;
 
-  if FAutoReconnect then
+  if ReconnectionChallenge then
   begin
-    if MonConnectionLost then
-      ReconnectionChallenge := True;
+    if ReconnectWnd=0 then
+      ReconnectWnd := AllocateHWnd(ReconnectWndProc);
 
-    if ReconnectionChallenge then
-    begin
-      if ReconnectWnd=0 then
-        ReconnectWnd := AllocateHWnd(ReconnectWndProc);
-
-      if SetTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
-        raise Exception.Create('Failed to create internal reconnection timer');
-      ReconnectionTimerEnabled := True;
-    end;
+    if SetTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
+      raise Exception.Create('Failed to create internal reconnection timer');
+    ReconnectionTimerEnabled := True;
   end;
 end;
 
