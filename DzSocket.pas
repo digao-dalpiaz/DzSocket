@@ -43,9 +43,12 @@ interface
  in ScktComp. The Winsock2 is only used by KeepAlive function.
 }
 
-uses System.Classes, System.Win.ScktComp, Winapi.WinSock;
+uses System.Classes, System.Win.ScktComp,
+  Winapi.WinSock, Winapi.Windows, Winapi.Messages;
 
-const DEF_KEEPALIVE_INTERVAL = 15000;
+const
+  DEF_KEEPALIVE_INTERVAL = 15000;
+  DEF_AUTORECONNECT_INTERVAL = 10000;
 
 type
   TSocket = Winapi.WinSock.TSocket; {>IntPtr>NativeInt(Integer/Int64)} //force WinSock unit
@@ -89,6 +92,7 @@ type
   TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: string) of object;
   TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: string) of object;
   TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: string; var ResponseData: string) of object;
+  TDzSocketReconnectionEvent = procedure(Sender: TObject; Socket: TDzSocket; var Cancel: Boolean) of object;
 
   TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: string) of object;
 
@@ -107,7 +111,11 @@ type
   private
     C: TClientSocket;
 
-    Cache: TDzSocketCache;
+    Cache: TDzSocketCache;    
+    
+    ReconnectionChallenge: Boolean;
+    ReconnectionTimerEnabled: Boolean;
+    ReconnectWnd: HWND;
 
     FAbout: string;
 
@@ -117,6 +125,9 @@ type
     FKeepAlive: Boolean;
     FKeepAliveInterval: Integer;
 
+    FAutoReconnect: Boolean;
+    FAutoReconnectInterval: Integer;
+
     FOnLoginRequest: TDzSocketLoginRequestClientEvent;
     FOnLoginResponse: TDzSocketLoginResponseClientEvent;
     FOnConnect: TDzSocketEvent;
@@ -124,8 +135,11 @@ type
     FOnRead: TDzSocketReadEvent;
     FOnError: TDzSocketErrorEvent;
     FOnConnectionLost: TDzSocketEvent;
+    FOnReconnect: TDzSocketReconnectionEvent;
 
     MonConnectionLost: Boolean; //flag to connection lost monitoring
+
+    procedure ReconnectWndProc(var Msg: TMessage);
 
     procedure int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
     procedure int_OnDisconnect(Sender: TObject; Socket: TCustomWinSocket);
@@ -140,12 +154,16 @@ type
 
     procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
     procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
+    procedure ClearTimer;
+    procedure CreateSocket;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
 
     procedure Connect;
     procedure Disconnect;
+
+    procedure StopReconnection;
 
     procedure Send(const Cmd: Char; const A: string = '');
 
@@ -161,6 +179,10 @@ type
     property KeepAliveInterval: Integer read FKeepAliveInterval write FKeepAliveInterval
       default DEF_KEEPALIVE_INTERVAL;
 
+    property AutoReconnect: Boolean read FAutoReconnect write FAutoReconnect default False;
+    property AutoReconnectInterval: Integer read FAutoReconnectInterval write FAutoReconnectInterval
+      default DEF_AUTORECONNECT_INTERVAL;
+
     property OnLoginRequest: TDzSocketLoginRequestClientEvent read FOnLoginRequest write FOnLoginRequest;
     property OnLoginResponse: TDzSocketLoginResponseClientEvent read FOnLoginResponse write FOnLoginResponse;
     property OnConnect: TDzSocketEvent read FOnConnect write FOnConnect;
@@ -168,6 +190,7 @@ type
     property OnRead: TDzSocketReadEvent read FOnRead write FOnRead;
     property OnError: TDzSocketErrorEvent read FOnError write FOnError;
     property OnConnectionLost: TDzSocketEvent read FOnConnectionLost write FOnConnectionLost;
+    property OnReconnect: TDzSocketReconnectionEvent read FOnReconnect write FOnReconnect;
   end;
 
   TDzTCPServer = class(TComponent)
@@ -253,11 +276,13 @@ procedure Register;
 implementation
 
 uses System.SysUtils, System.Variants,
-  Winapi.Winsock2, System.Generics.Collections  
+  Winapi.Winsock2, System.Generics.Collections
   {$IFDEF USE_JSON}, System.JSON{$ENDIF};
 
 const STR_VERSION = '2.6';
 const STR_ABOUT = 'Digao Dalpiaz / Version '+STR_VERSION;
+
+const INT_RECONNECTION_TIMER_ID = 1;
 
 procedure Register;
 begin
@@ -562,37 +587,49 @@ begin
   inherited;
   FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
+  FAutoReconnectInterval := DEF_AUTORECONNECT_INTERVAL;
+
+  CreateSocket;
 end;
 
 destructor TDzTCPClient.Destroy;
 begin
   if Assigned(Cache) then Cache.Free;
 
+  if ReconnectWnd<>0 then
+    DeallocateHWnd(ReconnectWnd);
+
   inherited;
+end;
+
+procedure TDzTCPClient.CreateSocket;
+begin
+  C := TClientSocket.Create(Self);
+  C.OnConnect := int_OnConnect;
+  C.OnDisconnect := int_OnDisconnect;
+  C.OnRead := int_OnRead;
+  C.OnError := int_OnError;
 end;
 
 procedure TDzTCPClient.Connect;
 begin
   if Connected then Exit;
 
+  ClearTimer; //ensure reconnection timer stopped
+
   if FHost=string.Empty then
     raise Exception.Create('Host not specified');
   if FPort=0 then
     raise Exception.Create('Port not specified');
 
-  if Assigned(C) then C.Free;
+  C.Free;
   {This is needed because after a connection error, when retry connection the
   socket component returns a different error and uses old host.
   So I always recreate the internal socket to fix this bug.}
 
   MonConnectionLost := False; //clear
 
-  C := TClientSocket.Create(Self);
-
-  C.OnConnect := int_OnConnect;
-  C.OnDisconnect := int_OnDisconnect;
-  C.OnRead := int_OnRead;
-  C.OnError := int_OnError;
+  CreateSocket;   
 
   C.Host := FHost;
   C.Port := FPort;
@@ -609,15 +646,12 @@ end;
 
 function TDzTCPClient.GetConnected: Boolean;
 begin
-  Result := Assigned(C) and C.Socket.Connected;
+  Result := C.Socket.Connected;
 end;
 
 function TDzTCPClient.GetSocketHandle: TSocket;
 begin
-  if Connected then
-    Result := C.Socket.SocketHandle
-  else
-    Result := Winapi.WinSock.INVALID_SOCKET;
+  Result := C.Socket.SocketHandle;
 end;
 
 procedure TDzTCPClient.Send(const Cmd: Char; const A: string);
@@ -629,9 +663,11 @@ begin
 end;
 
 procedure TDzTCPClient.int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
-var LoginMsg: string;
+var 
+  LoginMsg: string;
 begin
   MonConnectionLost := True; //enable connection lost monitoring
+  ReconnectionChallenge := False;
 
   if FKeepAlive then
     EnableKeepAlive(Socket, FKeepAliveInterval);
@@ -654,11 +690,66 @@ begin
   if Assigned(FOnDisconnect) then
     FOnDisconnect(Self, TDzSocket(C.Socket), WasConnected);
 
-  if MonConnectionLost then //disconnect command not by client
+  if MonConnectionLost then //disconnection did not come from the client
   begin
     if Assigned(FOnConnectionLost) then
       FOnConnectionLost(Self, TDzSocket(C.Socket));
   end;
+
+  if FAutoReconnect then
+  begin
+    if MonConnectionLost then
+      ReconnectionChallenge := True;
+
+    if ReconnectionChallenge then
+    begin
+      if ReconnectWnd=0 then
+        ReconnectWnd := AllocateHWnd(ReconnectWndProc);
+
+      if SetTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
+        raise Exception.Create('Failed to create internal reconnection timer');
+      ReconnectionTimerEnabled := True;
+    end;
+  end;
+end;
+
+procedure TDzTCPClient.ReconnectWndProc(var Msg: TMessage);
+var
+  Cancel: Boolean;
+begin
+  if Msg.Msg <> WM_TIMER then Exit;
+
+  ClearTimer;
+
+  if Assigned(FOnReconnect) then
+  begin
+    Cancel := False;
+    FOnReconnect(Self, TDzSocket(C.Socket), Cancel);
+    if Cancel then
+    begin
+      ReconnectionChallenge := False;
+      Exit;
+    end;
+  end;
+
+  Connect; //try to reconnect
+end;
+
+procedure TDzTCPClient.ClearTimer;
+begin
+  if ReconnectionTimerEnabled then
+  begin
+    if not KillTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID) then
+      raise Exception.Create('Failed to destroy internal reconnection timer');
+      
+    ReconnectionTimerEnabled := False;
+  end;
+end;
+
+procedure TDzTCPClient.StopReconnection;
+begin
+  ClearTimer;
+  ReconnectionChallenge := False;
 end;
 
 procedure TDzTCPClient.int_OnRead(Sender: TObject; Socket: TCustomWinSocket);
