@@ -289,6 +289,8 @@ Retrieves only authenticated connections count.
 
 `AutoReconnectInterval: Integer` = Specifies the time in milliseconds to wait for a new reconnection attempt (default 10000 / *10 seconds*).
 
+`AutoReconnectAttempts: Integer` = How may times to try to reconnect after connection lost. Leave `0` value to retry infinitely.
+
 `KeepAlive: Boolean` = Allow enable KeepAlive socket native resource. This will send a keep-alive signal using KeepAliveInterval property.
 
 `KeepAliveInterval: Integer` = Specifies the KeepAlive interval in milliseconds (default 15000 / *15 seconds*).
@@ -350,7 +352,7 @@ procedure OnLoginResponse(Sender: TObject; Socket: TDzSocket; Accepted: Boolean;
 This event is triggered when server accepts or rejects the client connection. You can check this result into `Accepted` parameter, and the server may send to the client some data information into `Data` parameter.
 
 ```delphi
-procedure OnReconnection(Sender: TObject; Socket: TDzSocket; Cancel: Boolean)
+procedure OnReconnection(Sender: TObject; Socket: TDzSocket; Attempt: Integer; Cancel: Boolean)
 ```
 Occurs when `AutoReconnect` property is enabled and a connection is lost, after the `AutoReconnectInterval` miliseconds. If the attempt to reconnect fails, the event will be triggered successively until a connection is established.
 You can cancel the reconnection attemps by changing `Cancel` property to `True` in reconnection event, or calling `StopReconnection` method.
