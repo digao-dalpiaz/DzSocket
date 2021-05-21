@@ -49,6 +49,7 @@ uses System.Classes, System.Win.ScktComp,
 const
   DEF_KEEPALIVE_INTERVAL = 15000;
   DEF_AUTORECONNECT_INTERVAL = 10000;
+  DEF_AUTORECONNECT_ATTEMPTS = 10;
 
 type
   TSocket = Winapi.WinSock.TSocket; {>IntPtr>NativeInt(Integer/Int64)} //force WinSock unit
@@ -92,7 +93,7 @@ type
   TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: string) of object;
   TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: string) of object;
   TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: string; var ResponseData: string) of object;
-  TDzSocketReconnectionEvent = procedure(Sender: TObject; Socket: TDzSocket; var Cancel: Boolean) of object;
+  TDzSocketReconnectionEvent = procedure(Sender: TObject; Socket: TDzSocket; Attempt: Integer; var Cancel: Boolean) of object;
 
   TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: string) of object;
 
@@ -112,10 +113,13 @@ type
     C: TClientSocket;
 
     Cache: TDzSocketCache;    
-    
-    ReconnectionChallenge: Boolean;
-    ReconnectionTimerEnabled: Boolean;
-    ReconnectWnd: HWND;
+
+    Reconnection: record
+      Challenge: Boolean;
+      TimerEnabled: Boolean;
+      Attempt: Integer;
+      Handle: HWND;
+    end;
 
     FAbout: string;
 
@@ -127,6 +131,7 @@ type
 
     FAutoReconnect: Boolean;
     FAutoReconnectInterval: Integer;
+    FAutoReconnectAttempts: Integer;
 
     FOnLoginRequest: TDzSocketLoginRequestClientEvent;
     FOnLoginResponse: TDzSocketLoginResponseClientEvent;
@@ -182,6 +187,8 @@ type
     property AutoReconnect: Boolean read FAutoReconnect write FAutoReconnect default False;
     property AutoReconnectInterval: Integer read FAutoReconnectInterval write FAutoReconnectInterval
       default DEF_AUTORECONNECT_INTERVAL;
+    property AutoReconnectAttempts: Integer read FAutoReconnectAttempts write FAutoReconnectAttempts
+      default DEF_AUTORECONNECT_ATTEMPTS;
 
     property OnLoginRequest: TDzSocketLoginRequestClientEvent read FOnLoginRequest write FOnLoginRequest;
     property OnLoginResponse: TDzSocketLoginResponseClientEvent read FOnLoginResponse write FOnLoginResponse;
@@ -588,6 +595,7 @@ begin
   FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
   FAutoReconnectInterval := DEF_AUTORECONNECT_INTERVAL;
+  FAutoReconnectAttempts := DEF_AUTORECONNECT_ATTEMPTS;
 
   CreateSocket;
 end;
@@ -596,8 +604,8 @@ destructor TDzTCPClient.Destroy;
 begin
   if Assigned(Cache) then Cache.Free;
 
-  if ReconnectWnd<>0 then
-    DeallocateHWnd(ReconnectWnd);
+  if Reconnection.Handle<>0 then
+    DeallocateHWnd(Reconnection.Handle);
 
   inherited;
 end;
@@ -667,7 +675,7 @@ var
   LoginMsg: string;
 begin
   MonConnectionLost := True; //enable connection lost monitoring
-  ReconnectionChallenge := False;
+  Reconnection.Challenge := False;
 
   if FKeepAlive then
     EnableKeepAlive(Socket, FKeepAliveInterval);
@@ -696,17 +704,24 @@ begin
       FOnConnectionLost(Self, TDzSocket(C.Socket));
 
     if FAutoReconnect then
-      ReconnectionChallenge := True;
+    begin
+      Reconnection.Challenge := True;
+      Reconnection.Attempt := 0;
+    end;
   end;
 
-  if ReconnectionChallenge then
+  if Reconnection.Challenge then
   begin
-    if ReconnectWnd=0 then
-      ReconnectWnd := AllocateHWnd(ReconnectWndProc);
+    if (FAutoReconnectAttempts=0) or (Reconnection.Attempt<FAutoReconnectAttempts) then
+    begin
+      if Reconnection.Handle=0 then
+        Reconnection.Handle := AllocateHWnd(ReconnectWndProc);
 
-    if SetTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
-      raise Exception.Create('Failed to create internal reconnection timer');
-    ReconnectionTimerEnabled := True;
+      if SetTimer(Reconnection.Handle, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
+        raise Exception.Create('Failed to create internal reconnection timer');
+      Reconnection.TimerEnabled := True;
+    end else
+      Reconnection.Challenge := False;
   end;
 end;
 
@@ -718,13 +733,14 @@ begin
 
   ClearTimer;
 
+  Inc(Reconnection.Attempt);
   if Assigned(FOnReconnect) then
   begin
     Cancel := False;
-    FOnReconnect(Self, TDzSocket(C.Socket), Cancel);
+    FOnReconnect(Self, TDzSocket(C.Socket), Reconnection.Attempt, Cancel);
     if Cancel then
     begin
-      ReconnectionChallenge := False;
+      Reconnection.Challenge := False;
       Exit;
     end;
   end;
@@ -734,19 +750,19 @@ end;
 
 procedure TDzTCPClient.ClearTimer;
 begin
-  if ReconnectionTimerEnabled then
+  if Reconnection.TimerEnabled then
   begin
-    if not KillTimer(ReconnectWnd, INT_RECONNECTION_TIMER_ID) then
+    if not KillTimer(Reconnection.Handle, INT_RECONNECTION_TIMER_ID) then
       raise Exception.Create('Failed to destroy internal reconnection timer');
-      
-    ReconnectionTimerEnabled := False;
+
+    Reconnection.TimerEnabled := False;
   end;
 end;
 
 procedure TDzTCPClient.StopReconnection;
 begin
   ClearTimer;
-  ReconnectionChallenge := False;
+  Reconnection.Challenge := False;
 end;
 
 procedure TDzTCPClient.int_OnRead(Sender: TObject; Socket: TCustomWinSocket);
