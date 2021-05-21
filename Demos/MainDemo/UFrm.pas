@@ -73,9 +73,9 @@ type
     procedure SClientLoginCheck(Sender: TObject; Socket: TDzSocket;
       var Accept: Boolean; const RequestData: string; var ResponseData: string);
     procedure SClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
-    procedure CReconnect(Sender: TObject; Socket: TDzSocket;
-      var Cancel: Boolean);
     procedure BtnStopReconnectionClick(Sender: TObject);
+    procedure CReconnect(Sender: TObject; Socket: TDzSocket; Attempt: Integer;
+      var Cancel: Boolean);
   private
     procedure LogServer(const A: string);
     procedure LogClient(const A: string);
@@ -422,6 +422,12 @@ begin
   LogClient('Connection lost!');
 end;
 
+procedure TFrm.CReconnect(Sender: TObject; Socket: TDzSocket; Attempt: Integer;
+  var Cancel: Boolean);
+begin
+  LogClient(Format('Reconnecting... (Attempt %d)', [Attempt]));
+end;
+
 procedure TFrm.CDisconnect(Sender: TObject; Socket: TDzSocket;
   const WasConnected: Boolean);
 begin
@@ -436,12 +442,6 @@ begin
   EdName.Enabled := True;
 
   ClearClientUsers;
-end;
-
-procedure TFrm.CReconnect(Sender: TObject; Socket: TDzSocket;
-  var Cancel: Boolean);
-begin
-  LogClient('Reconnecting...');
 end;
 
 procedure TFrm.CError(Sender: TObject; Socket: TDzSocket;

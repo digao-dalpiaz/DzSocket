@@ -161,6 +161,7 @@ type
     procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
     procedure ClearTimer;
     procedure CreateSocket;
+    procedure DoInternalConnect;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
@@ -174,6 +175,7 @@ type
 
     property Connected: Boolean read GetConnected;
     property SocketHandle: TSocket read GetSocketHandle;
+    property InReconnectionChallenge: Boolean read Reconnection.Challenge;
   published
     property About: string read FAbout;
 
@@ -623,8 +625,12 @@ procedure TDzTCPClient.Connect;
 begin
   if Connected then Exit;
 
-  ClearTimer; //ensure reconnection timer stopped
+  StopReconnection; //ensure reconnection stopped
+  DoInternalConnect;
+end;
 
+procedure TDzTCPClient.DoInternalConnect;
+begin
   if FHost=string.Empty then
     raise Exception.Create('Host not specified');
   if FPort=0 then
@@ -707,6 +713,9 @@ begin
     begin
       Reconnection.Challenge := True;
       Reconnection.Attempt := 0;
+
+      if Reconnection.Handle=0 then
+        Reconnection.Handle := AllocateHWnd(ReconnectWndProc);
     end;
   end;
 
@@ -714,9 +723,6 @@ begin
   begin
     if (FAutoReconnectAttempts=0) or (Reconnection.Attempt<FAutoReconnectAttempts) then
     begin
-      if Reconnection.Handle=0 then
-        Reconnection.Handle := AllocateHWnd(ReconnectWndProc);
-
       if SetTimer(Reconnection.Handle, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
         raise Exception.Create('Failed to create internal reconnection timer');
       Reconnection.TimerEnabled := True;
@@ -745,7 +751,7 @@ begin
     end;
   end;
 
-  Connect; //try to reconnect
+  DoInternalConnect; //try to reconnect
 end;
 
 procedure TDzTCPClient.ClearTimer;

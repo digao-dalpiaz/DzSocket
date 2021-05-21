@@ -656,6 +656,7 @@ object Frm: TFrm
     KeepAlive = True
     AutoReconnect = True
     AutoReconnectInterval = 5000
+    AutoReconnectAttempts = 3
     OnLoginRequest = CLoginRequest
     OnLoginResponse = CLoginResponse
     OnConnect = CConnect
