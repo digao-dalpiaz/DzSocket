@@ -15,13 +15,12 @@ interface
 {TCP Socket Asynchronous communication / Non-Blocking
 
  The messages uses following syntax:
-   [CHAR_IDENT_PART][LENGTH][INTERNALCMD][CMD][MSG]
+   [CHAR_IDENT_PART(AnsiChar)][LENGTH(Int64)][INTERNALCMD][CMD][MSG]
 
  - The identification character is a security data to confirm the message
    buffer beginning.
 
- - The length is calculated by InternalCmd+Cmd+Msg, represented by 4 bytes
-   using an Integer structure stored as AnsiString.
+ - The length is the stream size of InternalCmd+Cmd+Msg.
 
  CACHE:
  When sending long messages or consecutive messages, it may be received by
@@ -43,7 +42,8 @@ interface
  in ScktComp. The Winsock2 is only used by KeepAlive function.
 }
 
-uses System.Classes, System.Win.ScktComp, Winapi.WinSock;
+uses System.Classes, System.Win.ScktComp, Winapi.WinSock,
+  System.SyncObjs;
 
 const DEF_KEEPALIVE_INTERVAL = 15000;
 
@@ -55,8 +55,11 @@ type
 
   TDzSocketCache = class
   private
-    Data: AnsiString;
-    Size: Integer;
+    Single: TCriticalSection;
+    Data: TMemoryStream;
+  public
+    constructor Create;
+    destructor Destroy; override;
   end;
 
   TDzServerClientSocket = class(TServerClientWinSocket) //class for Clients on Server
@@ -66,6 +69,8 @@ type
     Disconnected: Boolean;
     Auth: Boolean; //successful login
   public
+    constructor Create(Socket: TSocket; ServerWinSocket: TServerWinSocket;
+      ServerComp: TDzTCPServer);
     destructor Destroy; override;
   end;
 
@@ -335,176 +340,146 @@ end;
 {$ENDREGION}
 
 {$REGION 'Read/Send function'}
-type PSockCache = ^TDzSocketCache;
-function GetCachePointer(Comp: TComponent; Socket: TCustomWinSocket): PSockCache;
+function GetCache(Comp: TComponent; Socket: TCustomWinSocket): TDzSocketCache;
 begin
   //Get cache pointer by component class
   if Comp is TDzTCPClient then
-    Result := @TDzTCPClient(Comp).Cache
+    Result := TDzTCPClient(Comp).Cache
   else
   if Comp is TDzTCPServer then
-    Result := @TDzServerClientSocket(Socket).Cache
+    Result := TDzServerClientSocket(Socket).Cache
   else
-    raise Exception.Create('Socket: Unknown class to get cache pointer');
-end;
-
-type TSockMsgSize = Integer;
-const STRUCT_MSGSIZE = SizeOf(TSockMsgSize); //4 bytes
-function SizeToString(const Value: TSockMsgSize): AnsiString;
-begin
-  SetLength(Result, STRUCT_MSGSIZE);
-  Move(Value, Result[1], STRUCT_MSGSIZE);
-end;
-
-function StringToSize(const Value: AnsiString): TSockMsgSize;
-var mv_Value: AnsiString;
-begin
-  mv_Value := Value;
-  Move(mv_Value[1], Result, STRUCT_MSGSIZE);
+    raise Exception.Create('Socket: Unknown class to get cache');
 end;
 
 const
-  CHAR_IDENT_PART = #2;
+  CHAR_IDENT_PART: AnsiChar = #2;
   CHAR_CMD_INT_CMD = #5;
   CHAR_CMD_INT_MSG = #16;
 
   CHAR_CMD_LOGIN = 'L';
   CHAR_CMD_ACCEPT = 'A';
   CHAR_CMD_REJECT = 'R';
-     
+
+type EReading = class(Exception);
+
 procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
    EvError: TDzSocketErrorEvent;
    Cmd_Proc: TDzSocketIntenalProc;
    Read_Proc: TDzSocketIntenalProc);
 
-  procedure ReadPart(const Msg: AnsiString);
+  procedure ReadPart(const Msg: string);
   var
-    SU, SA: TStringStream;
-    W: string;
     InternalCmd, Cmd: Char;
     Data: string;
   begin
-    SU := TStringStream.Create(string.Empty, TEncoding.Unicode);
-    try
-      SA := TStringStream.Create(Msg);
-      try
-        SU.LoadFromStream(SA); //convert to Unicode
-      finally
-        SA.Free;
-      end;
+    if Msg.Length<2 then raise EReading.Create('Invalid size of message part');
 
-      W := SU.DataString;
-    finally
-      SU.Free;
-    end;
-
-    if W.Length<2 then raise Exception.Create('Socket: Invalid size of message part');
-
-    InternalCmd := W[1];
-    Cmd := W[2];
-    Data := W.Remove(0{0-based}, 2);
+    InternalCmd := Msg[1];
+    Cmd := Msg[2];
+    Data := Msg.Remove(0{0-based}, 2);
 
     case InternalCmd of
       CHAR_CMD_INT_CMD: Cmd_Proc(TDzSocket(Socket), Cmd, Data);
       CHAR_CMD_INT_MSG: Read_Proc(TDzSocket(Socket), Cmd, Data);
-      else raise Exception.Create('Socket: Invalid internal command');
+      else raise EReading.Create('Invalid internal command');
     end;
   end;
 
 var
-  PCache: PSockCache;
   Cache: TDzSocketCache;
-  Buf: AnsiString;
-  LMsgs: TList<AnsiString>;
-  Msg: AnsiString;
-  X, Len, ReadSize: Integer;
+  Len: Integer;
+  Buf: TBytes;
+  IdentChar: AnsiChar;
+  MsgSize, RemainingSize: Int64;
+  M: TStringStream;
+  OldStm: TMemoryStream;
 begin
-  Buf := Socket.ReceiveText; //read socket buffer
-
-  PCache := GetCachePointer(Comp, Socket); //get cache pointer
-  if not Assigned(PCache^) then
-    PCache^ := TDzSocketCache.Create;
-
-  Cache := PCache^;
-
-  LMsgs := TList<AnsiString>.Create;
+  Cache := GetCache(Comp, Socket);
+  Cache.Single.Enter;
   try
+    Len := Socket.ReceiveLength;
+
+    SetLength(Buf, Len);
+    Socket.ReceiveBuf(Buf[0], Len);
+
+    Cache.Data.Seek(0, soEnd);
+    Cache.Data.Write(Buf, Len);
+
     try
-      X := 1;
-      Len := Length(Buf);
-      while X<=Len do
+      while Cache.Data.Size >= ( SizeOf(IdentChar)+SizeOf(MsgSize) ) do
       begin
-        if Cache.Size>0 then //should be here first
-        begin
-          ReadSize := Len-X+1;
-          if Cache.Size<ReadSize then ReadSize := Cache.Size;
-          Cache.Data := Cache.Data + Copy(Buf, X, ReadSize);
-          Dec(Cache.Size, ReadSize);
-          Inc(X, ReadSize);
+        Cache.Data.Seek(0, soBeginning);
+        Cache.Data.ReadData(IdentChar, SizeOf(IdentChar));
+        if IdentChar<>CHAR_IDENT_PART then
+          raise EReading.Create('Content does not start with ident char');
 
-          if Cache.Size=0 then //message completed
-          begin
-            LMsgs.Add(Cache.Data);
-            Cache.Data := EmptyAnsiStr;
-          end;
-        end else
-        if Buf[X]=CHAR_IDENT_PART then
-        begin
-          if X+STRUCT_MSGSIZE > Len then raise Exception.Create('Incomplete prefix');
+        Cache.Data.ReadData(MsgSize, SizeOf(MsgSize));
+        if MsgSize<=0 then raise EReading.Create('Invalid message size');
+        if (Cache.Data.Size-Cache.Data.Position)<MsgSize then Break; //message not yet complete
 
-          Cache.Size := StringToSize(Copy(Buf, X+1, STRUCT_MSGSIZE));
-          Inc(X, 1+STRUCT_MSGSIZE);
+        M := TStringStream.Create(EmptyStr, TEncoding.UTF8);
+        try
+          M.CopyFrom(Cache.Data, MsgSize);
+          ReadPart(M.DataString);
+        finally
+          M.Free;
+        end;
 
-          if Cache.Size<=0 then raise Exception.Create('Invalid size');
-        end else
-          raise Exception.Create('Invalid data');
+        OldStm := Cache.Data;
+        Cache.Data := TMemoryStream.Create;
+        try
+          RemainingSize := OldStm.Size - OldStm.Position;
+          if RemainingSize>0 then
+            Cache.Data.CopyFrom(OldStm, RemainingSize);
+        finally
+          OldStm.Free;
+        end;
       end;
     except
-      on E: Exception do
+      on E: EReading do
+      begin
+        Cache.Data.Clear;
+
         if Assigned(EvError) then
           EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
+      end;
     end;
-
-    {The final Read event is not together with buffer receive because it
-    can't determine how long the Read event will take, depending on programmer
-    codes, so its only fired after all buffer receiving is done, avoiding
-    messages parts overload.}
-
-    for Msg in LMsgs do
-      ReadPart(Msg);
-
   finally
-    LMsgs.Free;
+    Cache.Single.Leave;
   end;
 end;
 
 procedure SockSend(Socket: TCustomWinSocket;
   const Cmd: Char; const A: string; IsInternalCmd: Boolean = False);
 var
-  SU, SA: TStringStream;  
-  ansiData: AnsiString;
   InternalCmd: Char;
+  SSend: TMemoryStream;
+  SMsg: TStringStream;
 begin
   if IsInternalCmd then
     InternalCmd := CHAR_CMD_INT_CMD
   else
     InternalCmd := CHAR_CMD_INT_MSG;
 
-  SA := TStringStream.Create;
-  try
-    SU := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.Unicode);
-    try
-      SA.LoadFromStream(SU); //convert to Ansi
-    finally
-      SU.Free;
-    end;
-    ansiData := AnsiString(SA.DataString);
-  finally
-    SA.Free;
-  end;   
+  SSend := TMemoryStream.Create;
+  SSend.WriteData(CHAR_IDENT_PART);
 
-  Socket.SendText(CHAR_IDENT_PART+SizeToString(Length(ansiData))+ansiData);
+  SMsg := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.UTF8);
+  try
+    SSend.WriteData(SMsg.Size);
+    SSend.CopyFrom(SMsg, 0);
+  finally
+    SMsg.Free;
+  end;
+
+  SSend.Position := 0;
+  Socket.SendStream(SSend);
+
+  //Streams disposed by SendStream!
 end;
+
+//procedure Send
 {$ENDREGION}
 
 {$REGION 'TDzSocket'}
@@ -524,6 +499,20 @@ end;
 procedure TDzSocket.Send(const Cmd: Char; const A: string);
 begin
   SockSend(Self, Cmd, A);
+end;
+{$ENDREGION}
+
+{$REGION 'TDzSocketCache'}
+constructor TDzSocketCache.Create;
+begin
+  Single := TCriticalSection.Create;
+  Data := TMemoryStream.Create;
+end;
+
+destructor TDzSocketCache.Destroy;
+begin
+  Single.Free;
+  Data.Free;
 end;
 {$ENDREGION}
 
@@ -562,11 +551,13 @@ begin
   inherited;
   FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
+
+  Cache := TDzSocketCache.Create;
 end;
 
 destructor TDzTCPClient.Destroy;
 begin
-  if Assigned(Cache) then Cache.Free;
+  Cache.Free;
 
   inherited;
 end;
@@ -788,15 +779,22 @@ end;
 
 procedure TDzTCPServer.int_OnGetSocket(Sender: TObject; Socket: NativeInt; var SC: TServerClientWinSocket);
 begin
-  SC := TDzServerClientSocket.Create(Socket, S.Socket);
-  TDzServerClientSocket(SC).Comp := Self;
+  SC := TDzServerClientSocket.Create(Socket, S.Socket, Self);
+end;
+
+constructor TDzServerClientSocket.Create(Socket: TSocket;
+  ServerWinSocket: TServerWinSocket; ServerComp: TDzTCPServer);
+begin
+  inherited Create(Socket, ServerWinSocket);
+  Comp := ServerComp;
+  Cache := TDzSocketCache.Create;
 end;
 
 destructor TDzServerClientSocket.Destroy; // !!!
 begin
   //Comp.OnClientDisconnect(nil, Self); - here the socket object does not exist anymore!!!
 
-  if Assigned(Cache) then Cache.Free;
+  Cache.Free;
 
   if Comp.AutoFreeObjs then
     if Assigned(Data) then TObject(Data).Free;
