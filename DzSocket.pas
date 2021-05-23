@@ -15,7 +15,7 @@ interface
 {TCP Socket Asynchronous communication / Non-Blocking
 
  The messages uses following syntax:
-   [CHAR_IDENT_PART(AnsiChar)][LENGTH(Int64)][INTERNALCMD][CMD][MSG]
+   [CHAR_IDENT_PART(AnsiChar)][LENGTH(Integer)][INTERNALCMD][CMD][MSG]
 
  - The identification character is a security data to confirm the message
    buffer beginning.
@@ -361,7 +361,9 @@ const
   CHAR_CMD_ACCEPT = 'A';
   CHAR_CMD_REJECT = 'R';
 
-type EReading = class(Exception);
+type
+  TMsgSize = Integer;
+  EReading = class(Exception);
 
 procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
    EvError: TDzSocketErrorEvent;
@@ -391,9 +393,10 @@ var
   Len: Integer;
   Buf: TBytes;
   IdentChar: AnsiChar;
-  MsgSize, RemainingSize: Int64;
+  MsgSize: TMsgSize;
   M: TStringStream;
   OldStm: TMemoryStream;
+  RemainingSize: Int64;
 begin
   Cache := GetCache(Comp, Socket);
   Cache.Single.Enter;
@@ -467,7 +470,10 @@ begin
 
   SMsg := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.UTF8);
   try
-    SSend.WriteData(SMsg.Size);
+    if SMsg.Size > TMsgSize.MaxValue then
+      raise Exception.Create('The message size is too large');
+
+    SSend.WriteData(TMsgSize(SMsg.Size));
     SSend.CopyFrom(SMsg, 0);
   finally
     SMsg.Free;
