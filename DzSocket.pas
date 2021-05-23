@@ -475,8 +475,7 @@ begin
 
   SSend.Position := 0;
   Socket.SendStream(SSend);
-
-  //Streams disposed by SendStream!
+  //Stream disposed by SendStream!
 end;
 
 //procedure Send
