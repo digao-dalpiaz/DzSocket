@@ -23,8 +23,9 @@
 
 ## What's New
 
-- 05/20/2021 (Version 2.7)
+- 05/25/2021 (Version 3.0)
 
+   - Redesigned data sending and receiving, using stream and UTF8 encoding, and avoiding receiving overload by using TCriticalSection.
    - Included automatic reconnection support.
 
 <details>
