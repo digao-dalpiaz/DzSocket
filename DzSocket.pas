@@ -292,7 +292,7 @@ uses System.SysUtils, System.Variants,
   Winapi.Winsock2, System.Generics.Collections
   {$IFDEF USE_JSON}, System.JSON{$ENDIF};
 
-const STR_VERSION = '2.6';
+const STR_VERSION = '3.0';
 const STR_ABOUT = 'Digao Dalpiaz / Version '+STR_VERSION;
 
 const INT_RECONNECTION_TIMER_ID = 1;
