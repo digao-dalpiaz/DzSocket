@@ -179,7 +179,6 @@ type
 
     property Connected: Boolean read GetConnected;
     property SocketHandle: TSocket read GetSocketHandle;
-    property InReconnectionChallenge: Boolean read Reconnection.Challenge;
   published
     property About: string read FAbout;
 

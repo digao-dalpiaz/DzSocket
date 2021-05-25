@@ -369,11 +369,13 @@ Connects to the server.
 ```delphi
 procedure Disconnect;
 ```
+
 Disconnects from the server.
 
 ```delphi
 procedure StopReconnection;
 ```
+
 Stops reconnection attemps when `AutoReconnect` is enabled and a connection is lost.
 
 ```delphi
@@ -403,6 +405,8 @@ var
   I: Integer;
   S: String;
 begin
+  I := 123;
+  S := 'Test';
   DzTCPClientTest.Send('M', ArrayToData([I, S]));
 end;
 ```
