@@ -26,6 +26,7 @@
 - 05/25/2021 (Version 3.0)
 
    - Redesigned data sending and receiving, using stream and UTF8 encoding, and avoiding receiving overload by using TCriticalSection.
+   - Improved error handling on socket message receiving.
    - Included automatic reconnection support.
 
 <details>
