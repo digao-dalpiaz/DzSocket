@@ -34,6 +34,7 @@ type
     LbServerLog: TLabel;
     LbClientLog: TLabel;
     Divider: TBevel;
+    BtnStopReconnection: TBitBtn;
     procedure FormCreate(Sender: TObject);
     procedure BtnOnServerClick(Sender: TObject);
     procedure BtnOffServerClick(Sender: TObject);
@@ -72,6 +73,9 @@ type
     procedure SClientLoginCheck(Sender: TObject; Socket: TDzSocket;
       var Accept: Boolean; const RequestData: string; var ResponseData: string);
     procedure SClientLoginSuccess(Sender: TObject; Socket: TDzSocket);
+    procedure BtnStopReconnectionClick(Sender: TObject);
+    procedure CReconnect(Sender: TObject; Socket: TDzSocket; Attempt: Integer;
+      var Cancel: Boolean);
   private
     procedure LogServer(const A: string);
     procedure LogClient(const A: string);
@@ -393,6 +397,8 @@ begin
   LogClient('Connected');
   if C.KeepAlive then
     LogClient(Format('KeepAlive enabled [%d ms]', [C.KeepAliveInterval]));
+  if C.AutoReconnect then
+    LogClient(Format('AutoReconnect enabled [%d ms]', [C.AutoReconnectInterval]));
 
   BtnClientDisconnect.Enabled := True;
 end;
@@ -414,6 +420,12 @@ end;
 procedure TFrm.CConnectionLost(Sender: TObject; Socket: TDzSocket);
 begin
   LogClient('Connection lost!');
+end;
+
+procedure TFrm.CReconnect(Sender: TObject; Socket: TDzSocket; Attempt: Integer;
+  var Cancel: Boolean);
+begin
+  LogClient(Format('Reconnecting... (Attempt %d)', [Attempt]));
 end;
 
 procedure TFrm.CDisconnect(Sender: TObject; Socket: TDzSocket;
@@ -523,6 +535,11 @@ end;
 procedure TFrm.BtnSendPrintClick(Sender: TObject);
 begin
   SendPrint;
+end;
+
+procedure TFrm.BtnStopReconnectionClick(Sender: TObject);
+begin
+  C.StopReconnection;
 end;
 
 end.

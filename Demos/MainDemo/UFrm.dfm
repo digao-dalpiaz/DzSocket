@@ -231,7 +231,7 @@ object Frm: TFrm
     Font.Style = []
     ParentFont = False
     ScrollBars = ssBoth
-    TabOrder = 17
+    TabOrder = 18
     WordWrap = False
   end
   object S_Cmd: TEdit
@@ -259,7 +259,7 @@ object Frm: TFrm
     Height = 21
     Enabled = False
     MaxLength = 1
-    TabOrder = 18
+    TabOrder = 19
     Text = 'M'
   end
   object C_Msg: TEdit
@@ -267,7 +267,7 @@ object Frm: TFrm
     Top = 480
     Width = 449
     Height = 21
-    TabOrder = 19
+    TabOrder = 20
     OnKeyPress = C_MsgKeyPress
   end
   object LCon: TListBox
@@ -426,7 +426,7 @@ object Frm: TFrm
     Top = 64
     Width = 121
     Height = 21
-    TabOrder = 14
+    TabOrder = 15
     Text = 'User_Test'
   end
   object EdClientPort: TEdit
@@ -619,7 +619,7 @@ object Frm: TFrm
       8989898989CCCCCC8989E8E8E8E8E8E8E8E8E8E8E8818181E8E8898989898989
       89898989898989898989E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8E8}
     NumGlyphs = 2
-    TabOrder = 16
+    TabOrder = 17
     TabStop = False
     OnClick = BtnSendPrintClick
   end
@@ -640,11 +640,23 @@ object Frm: TFrm
     Height = 89
     Style = lbOwnerDrawFixed
     ItemHeight = 18
-    TabOrder = 15
+    TabOrder = 16
     OnDrawItem = LUsersDrawItem
+  end
+  object BtnStopReconnection: TBitBtn
+    Left = 704
+    Top = 64
+    Width = 113
+    Height = 25
+    Caption = 'Stop Reconnection'
+    TabOrder = 14
+    OnClick = BtnStopReconnectionClick
   end
   object C: TDzTCPClient
     KeepAlive = True
+    AutoReconnect = True
+    AutoReconnectInterval = 5000
+    AutoReconnectAttempts = 3
     OnLoginRequest = CLoginRequest
     OnLoginResponse = CLoginResponse
     OnConnect = CConnect
@@ -652,6 +664,7 @@ object Frm: TFrm
     OnRead = CRead
     OnError = CError
     OnConnectionLost = CConnectionLost
+    OnReconnect = CReconnect
     Left = 640
     Top = 232
   end

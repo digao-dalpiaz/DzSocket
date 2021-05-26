@@ -15,13 +15,12 @@ interface
 {TCP Socket Asynchronous communication / Non-Blocking
 
  The messages uses following syntax:
-   [CHAR_IDENT_PART][LENGTH][INTERNALCMD][CMD][MSG]
+   [CHAR_IDENT_PART(AnsiChar)][LENGTH(Integer)][INTERNALCMD][CMD][MSG]
 
  - The identification character is a security data to confirm the message
    buffer beginning.
 
- - The length is calculated by InternalCmd+Cmd+Msg, represented by 4 bytes
-   using an Integer structure stored as AnsiString.
+ - The length is the stream size of InternalCmd+Cmd+Msg.
 
  CACHE:
  When sending long messages or consecutive messages, it may be received by
@@ -43,9 +42,13 @@ interface
  in ScktComp. The Winsock2 is only used by KeepAlive function.
 }
 
-uses System.Classes, System.Win.ScktComp, Winapi.WinSock;
+uses System.Classes, System.SyncObjs, System.Win.ScktComp,
+  Winapi.WinSock, Winapi.Windows, Winapi.Messages;
 
-const DEF_KEEPALIVE_INTERVAL = 15000;
+const
+  DEF_KEEPALIVE_INTERVAL = 15000;
+  DEF_AUTORECONNECT_INTERVAL = 10000;
+  DEF_AUTORECONNECT_ATTEMPTS = 10;
 
 type
   TSocket = Winapi.WinSock.TSocket; {>IntPtr>NativeInt(Integer/Int64)} //force WinSock unit
@@ -55,8 +58,11 @@ type
 
   TDzSocketCache = class
   private
-    Data: AnsiString;
-    Size: Integer;
+    Single: TCriticalSection;
+    Data: TMemoryStream;
+  public
+    constructor Create;
+    destructor Destroy; override;
   end;
 
   TDzServerClientSocket = class(TServerClientWinSocket) //class for Clients on Server
@@ -66,6 +72,8 @@ type
     Disconnected: Boolean;
     Auth: Boolean; //successful login
   public
+    constructor Create(Socket: TSocket; ServerWinSocket: TServerWinSocket;
+      ServerComp: TDzTCPServer);
     destructor Destroy; override;
   end;
 
@@ -89,6 +97,7 @@ type
   TDzSocketLoginRequestClientEvent = procedure(Sender: TObject; Socket: TDzSocket; var Data: string) of object;
   TDzSocketLoginResponseClientEvent = procedure(Sender: TObject; Socket: TDzSocket; Accepted: Boolean; const Data: string) of object;
   TDzSocketLoginServerEvent = procedure(Sender: TObject; Socket: TDzSocket; var Accept: Boolean; const RequestData: string; var ResponseData: string) of object;
+  TDzSocketReconnectionEvent = procedure(Sender: TObject; Socket: TDzSocket; Attempt: Integer; var Cancel: Boolean) of object;
 
   TDzSocketIntenalProc = procedure(Socket: TDzSocket; const Cmd: Char; const Data: string) of object;
 
@@ -107,7 +116,14 @@ type
   private
     C: TClientSocket;
 
-    Cache: TDzSocketCache;
+    Cache: TDzSocketCache;    
+
+    Reconnection: record
+      Challenge: Boolean;
+      TimerEnabled: Boolean;
+      Attempt: Integer;
+      Handle: HWND;
+    end;
 
     FAbout: string;
 
@@ -117,6 +133,10 @@ type
     FKeepAlive: Boolean;
     FKeepAliveInterval: Integer;
 
+    FAutoReconnect: Boolean;
+    FAutoReconnectInterval: Integer;
+    FAutoReconnectAttempts: Integer;
+
     FOnLoginRequest: TDzSocketLoginRequestClientEvent;
     FOnLoginResponse: TDzSocketLoginResponseClientEvent;
     FOnConnect: TDzSocketEvent;
@@ -124,8 +144,11 @@ type
     FOnRead: TDzSocketReadEvent;
     FOnError: TDzSocketErrorEvent;
     FOnConnectionLost: TDzSocketEvent;
+    FOnReconnect: TDzSocketReconnectionEvent;
 
     MonConnectionLost: Boolean; //flag to connection lost monitoring
+
+    procedure ReconnectWndProc(var Msg: TMessage);
 
     procedure int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
     procedure int_OnDisconnect(Sender: TObject; Socket: TCustomWinSocket);
@@ -140,12 +163,17 @@ type
 
     procedure DoInternalCmd(Socket: TDzSocket; const Cmd: Char; const Data: string);
     procedure DoRead(Socket: TDzSocket; const Cmd: Char; const Data: string);
+    procedure ClearTimer;
+    procedure CreateSocket;
+    procedure DoInternalConnect;
   public
     constructor Create(AOwner: TComponent); override;
     destructor Destroy; override;
 
     procedure Connect;
     procedure Disconnect;
+
+    procedure StopReconnection;
 
     procedure Send(const Cmd: Char; const A: string = '');
 
@@ -161,6 +189,12 @@ type
     property KeepAliveInterval: Integer read FKeepAliveInterval write FKeepAliveInterval
       default DEF_KEEPALIVE_INTERVAL;
 
+    property AutoReconnect: Boolean read FAutoReconnect write FAutoReconnect default False;
+    property AutoReconnectInterval: Integer read FAutoReconnectInterval write FAutoReconnectInterval
+      default DEF_AUTORECONNECT_INTERVAL;
+    property AutoReconnectAttempts: Integer read FAutoReconnectAttempts write FAutoReconnectAttempts
+      default DEF_AUTORECONNECT_ATTEMPTS;
+
     property OnLoginRequest: TDzSocketLoginRequestClientEvent read FOnLoginRequest write FOnLoginRequest;
     property OnLoginResponse: TDzSocketLoginResponseClientEvent read FOnLoginResponse write FOnLoginResponse;
     property OnConnect: TDzSocketEvent read FOnConnect write FOnConnect;
@@ -168,6 +202,7 @@ type
     property OnRead: TDzSocketReadEvent read FOnRead write FOnRead;
     property OnError: TDzSocketErrorEvent read FOnError write FOnError;
     property OnConnectionLost: TDzSocketEvent read FOnConnectionLost write FOnConnectionLost;
+    property OnReconnect: TDzSocketReconnectionEvent read FOnReconnect write FOnReconnect;
   end;
 
   TDzTCPServer = class(TComponent)
@@ -253,11 +288,13 @@ procedure Register;
 implementation
 
 uses System.SysUtils, System.Variants,
-  Winapi.Winsock2, System.Generics.Collections  
+  Winapi.Winsock2, System.Generics.Collections
   {$IFDEF USE_JSON}, System.JSON{$ENDIF};
 
-const STR_VERSION = '2.6';
+const STR_VERSION = '3.0';
 const STR_ABOUT = 'Digao Dalpiaz / Version '+STR_VERSION;
+
+const INT_RECONNECTION_TIMER_ID = 1;
 
 procedure Register;
 begin
@@ -335,175 +372,162 @@ end;
 {$ENDREGION}
 
 {$REGION 'Read/Send function'}
-type PSockCache = ^TDzSocketCache;
-function GetCachePointer(Comp: TComponent; Socket: TCustomWinSocket): PSockCache;
+function GetCache(Comp: TComponent; Socket: TCustomWinSocket): TDzSocketCache;
 begin
   //Get cache pointer by component class
   if Comp is TDzTCPClient then
-    Result := @TDzTCPClient(Comp).Cache
+    Result := TDzTCPClient(Comp).Cache
   else
   if Comp is TDzTCPServer then
-    Result := @TDzServerClientSocket(Socket).Cache
+    Result := TDzServerClientSocket(Socket).Cache
   else
-    raise Exception.Create('Socket: Unknown class to get cache pointer');
-end;
-
-type TSockMsgSize = Integer;
-const STRUCT_MSGSIZE = SizeOf(TSockMsgSize); //4 bytes
-function SizeToString(const Value: TSockMsgSize): AnsiString;
-begin
-  SetLength(Result, STRUCT_MSGSIZE);
-  Move(Value, Result[1], STRUCT_MSGSIZE);
-end;
-
-function StringToSize(const Value: AnsiString): TSockMsgSize;
-var mv_Value: AnsiString;
-begin
-  mv_Value := Value;
-  Move(mv_Value[1], Result, STRUCT_MSGSIZE);
+    raise Exception.Create('Socket: Unknown class to get cache');
 end;
 
 const
-  CHAR_IDENT_PART = #2;
+  CHAR_IDENT_PART: AnsiChar = #2;
   CHAR_CMD_INT_CMD = #5;
   CHAR_CMD_INT_MSG = #16;
 
   CHAR_CMD_LOGIN = 'L';
   CHAR_CMD_ACCEPT = 'A';
   CHAR_CMD_REJECT = 'R';
-     
+
+type
+  TMsgSize = Integer;
+
 procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
    EvError: TDzSocketErrorEvent;
    Cmd_Proc: TDzSocketIntenalProc;
    Read_Proc: TDzSocketIntenalProc);
 
-  procedure ReadPart(const Msg: AnsiString);
-  var
-    SU, SA: TStringStream;
-    W: string;
-    InternalCmd, Cmd: Char;
-    Data: string;
+  procedure DispatchError(E: Exception);
   begin
-    SU := TStringStream.Create(string.Empty, TEncoding.Unicode);
-    try
-      SA := TStringStream.Create(Msg);
-      try
-        SU.LoadFromStream(SA); //convert to Unicode
-      finally
-        SA.Free;
-      end;
-
-      W := SU.DataString;
-    finally
-      SU.Free;
-    end;
-
-    if W.Length<2 then raise Exception.Create('Socket: Invalid size of message part');
-
-    InternalCmd := W[1];
-    Cmd := W[2];
-    Data := W.Remove(0{0-based}, 2);
-
-    case InternalCmd of
-      CHAR_CMD_INT_CMD: Cmd_Proc(TDzSocket(Socket), Cmd, Data);
-      CHAR_CMD_INT_MSG: Read_Proc(TDzSocket(Socket), Cmd, Data);
-      else raise Exception.Create('Socket: Invalid internal command');
-    end;
+    if Assigned(EvError) then
+      EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
   end;
 
-var
-  PCache: PSockCache;
-  Cache: TDzSocketCache;
-  Buf: AnsiString;
-  LMsgs: TList<AnsiString>;
-  Msg: AnsiString;
-  X, Len, ReadSize: Integer;
-begin
-  Buf := Socket.ReceiveText; //read socket buffer
-
-  PCache := GetCachePointer(Comp, Socket); //get cache pointer
-  if not Assigned(PCache^) then
-    PCache^ := TDzSocketCache.Create;
-
-  Cache := PCache^;
-
-  LMsgs := TList<AnsiString>.Create;
-  try
+  procedure ReadPart(const Msg: string);
+  var
+    Proc: TDzSocketIntenalProc;
+  begin
     try
-      X := 1;
-      Len := Length(Buf);
-      while X<=Len do
-      begin
-        if Cache.Size>0 then //should be here first
-        begin
-          ReadSize := Len-X+1;
-          if Cache.Size<ReadSize then ReadSize := Cache.Size;
-          Cache.Data := Cache.Data + Copy(Buf, X, ReadSize);
-          Dec(Cache.Size, ReadSize);
-          Inc(X, ReadSize);
+      if Msg.Length<2 then raise Exception.Create('Invalid size of message part');
 
-          if Cache.Size=0 then //message completed
-          begin
-            LMsgs.Add(Cache.Data);
-            Cache.Data := EmptyAnsiStr;
-          end;
-        end else
-        if Buf[X]=CHAR_IDENT_PART then
-        begin
-          if X+STRUCT_MSGSIZE > Len then raise Exception.Create('Incomplete prefix');
-
-          Cache.Size := StringToSize(Copy(Buf, X+1, STRUCT_MSGSIZE));
-          Inc(X, 1+STRUCT_MSGSIZE);
-
-          if Cache.Size<=0 then raise Exception.Create('Invalid size');
-        end else
-          raise Exception.Create('Invalid data');
+      case Msg[1] of
+        CHAR_CMD_INT_CMD: Proc := Cmd_Proc;
+        CHAR_CMD_INT_MSG: Proc := Read_Proc;
+        else raise Exception.Create('Invalid internal command');
       end;
     except
       on E: Exception do
-        if Assigned(EvError) then
-          EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
+      begin
+        DispatchError(E);
+        Exit;
+      end;
     end;
 
-    {The final Read event is not together with buffer receive because it
-    can't determine how long the Read event will take, depending on programmer
-    codes, so its only fired after all buffer receiving is done, avoiding
-    messages parts overload.}
+    Proc(TDzSocket(Socket), Msg[2], Msg.Remove(0{0-based}, 2));
+  end;
 
-    for Msg in LMsgs do
-      ReadPart(Msg);
+var
+  LStrStreams: TObjectList<TStringStream>;
+  Cache: TDzSocketCache;
+  Len: Integer;
+  Buf: TBytes;
+  IdentChar: AnsiChar;
+  MsgSize: TMsgSize;
+  M: TStringStream;
+  OldStm: TMemoryStream;
+  RemainingSize: Int64;
+begin
+  LStrStreams := TObjectList<TStringStream>.Create;
+  try
+    Cache := GetCache(Comp, Socket);
+    Cache.Single.Enter;
+    try
+      Len := Socket.ReceiveLength;
 
+      SetLength(Buf, Len);
+      Socket.ReceiveBuf(Buf[0], Len);
+
+      Cache.Data.Seek(0, soEnd);
+      Cache.Data.Write(Buf, Len);
+
+      try
+        while Cache.Data.Size >= ( SizeOf(IdentChar)+SizeOf(MsgSize) ) do
+        begin
+          Cache.Data.Seek(0, soBeginning);
+          Cache.Data.ReadData(IdentChar, SizeOf(IdentChar));
+          if IdentChar<>CHAR_IDENT_PART then
+            raise Exception.Create('Content does not start with ident char');
+
+          Cache.Data.ReadData(MsgSize, SizeOf(MsgSize));
+          if MsgSize<=0 then raise Exception.Create('Invalid message size');
+          if (Cache.Data.Size-Cache.Data.Position)<MsgSize then Break; //message not yet complete
+
+          M := TStringStream.Create(EmptyStr, TEncoding.UTF8);
+          LStrStreams.Add(M);
+
+          M.CopyFrom(Cache.Data, MsgSize);
+
+          OldStm := Cache.Data;
+          Cache.Data := TMemoryStream.Create;
+          try
+            RemainingSize := OldStm.Size - OldStm.Position;
+            if RemainingSize>0 then
+              Cache.Data.CopyFrom(OldStm, RemainingSize);
+          finally
+            OldStm.Free;
+          end;
+        end;
+      except
+        on E: Exception do
+        begin
+          Cache.Data.Clear;
+          DispatchError(E);
+        end;
+      end;
+    finally
+      Cache.Single.Leave;
+    end;
+
+    for M in LStrStreams do
+      ReadPart(M.DataString);
   finally
-    LMsgs.Free;
+    LStrStreams.Free;
   end;
 end;
 
 procedure SockSend(Socket: TCustomWinSocket;
   const Cmd: Char; const A: string; IsInternalCmd: Boolean = False);
 var
-  SU, SA: TStringStream;  
-  ansiData: AnsiString;
   InternalCmd: Char;
+  SSend: TMemoryStream;
+  SMsg: TStringStream;
 begin
   if IsInternalCmd then
     InternalCmd := CHAR_CMD_INT_CMD
   else
     InternalCmd := CHAR_CMD_INT_MSG;
 
-  SA := TStringStream.Create;
-  try
-    SU := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.Unicode);
-    try
-      SA.LoadFromStream(SU); //convert to Ansi
-    finally
-      SU.Free;
-    end;
-    ansiData := AnsiString(SA.DataString);
-  finally
-    SA.Free;
-  end;   
+  SSend := TMemoryStream.Create;
+  SSend.WriteData(CHAR_IDENT_PART);
 
-  Socket.SendText(CHAR_IDENT_PART+SizeToString(Length(ansiData))+ansiData);
+  SMsg := TStringStream.Create(InternalCmd+Cmd+A, TEncoding.UTF8);
+  try
+    if SMsg.Size > TMsgSize.MaxValue then
+      raise Exception.Create('The message size is too large');
+
+    SSend.WriteData(TMsgSize(SMsg.Size));
+    SSend.CopyFrom(SMsg, 0);
+  finally
+    SMsg.Free;
+  end;
+
+  SSend.Position := 0;
+  Socket.SendStream(SSend);
+  //Stream disposed by SendStream!
 end;
 {$ENDREGION}
 
@@ -524,6 +548,20 @@ end;
 procedure TDzSocket.Send(const Cmd: Char; const A: string);
 begin
   SockSend(Self, Cmd, A);
+end;
+{$ENDREGION}
+
+{$REGION 'TDzSocketCache'}
+constructor TDzSocketCache.Create;
+begin
+  Single := TCriticalSection.Create;
+  Data := TMemoryStream.Create;
+end;
+
+destructor TDzSocketCache.Destroy;
+begin
+  Single.Free;
+  Data.Free;
 end;
 {$ENDREGION}
 
@@ -562,37 +600,56 @@ begin
   inherited;
   FAbout := STR_ABOUT;
   FKeepAliveInterval := DEF_KEEPALIVE_INTERVAL;
+  FAutoReconnectInterval := DEF_AUTORECONNECT_INTERVAL;
+  FAutoReconnectAttempts := DEF_AUTORECONNECT_ATTEMPTS;
+
+  CreateSocket;
+
+  Cache := TDzSocketCache.Create;
 end;
 
 destructor TDzTCPClient.Destroy;
 begin
-  if Assigned(Cache) then Cache.Free;
+  Cache.Free;
+
+  if Reconnection.Handle<>0 then
+    DeallocateHWnd(Reconnection.Handle);
 
   inherited;
+end;
+
+procedure TDzTCPClient.CreateSocket;
+begin
+  C := TClientSocket.Create(Self);
+  C.OnConnect := int_OnConnect;
+  C.OnDisconnect := int_OnDisconnect;
+  C.OnRead := int_OnRead;
+  C.OnError := int_OnError;
 end;
 
 procedure TDzTCPClient.Connect;
 begin
   if Connected then Exit;
 
+  StopReconnection; //ensure reconnection stopped
+  DoInternalConnect;
+end;
+
+procedure TDzTCPClient.DoInternalConnect;
+begin
   if FHost=string.Empty then
     raise Exception.Create('Host not specified');
   if FPort=0 then
     raise Exception.Create('Port not specified');
 
-  if Assigned(C) then C.Free;
+  C.Free;
   {This is needed because after a connection error, when retry connection the
   socket component returns a different error and uses old host.
   So I always recreate the internal socket to fix this bug.}
 
   MonConnectionLost := False; //clear
 
-  C := TClientSocket.Create(Self);
-
-  C.OnConnect := int_OnConnect;
-  C.OnDisconnect := int_OnDisconnect;
-  C.OnRead := int_OnRead;
-  C.OnError := int_OnError;
+  CreateSocket;   
 
   C.Host := FHost;
   C.Port := FPort;
@@ -609,15 +666,12 @@ end;
 
 function TDzTCPClient.GetConnected: Boolean;
 begin
-  Result := Assigned(C) and C.Socket.Connected;
+  Result := C.Socket.Connected;
 end;
 
 function TDzTCPClient.GetSocketHandle: TSocket;
 begin
-  if Connected then
-    Result := C.Socket.SocketHandle
-  else
-    Result := Winapi.WinSock.INVALID_SOCKET;
+  Result := C.Socket.SocketHandle;
 end;
 
 procedure TDzTCPClient.Send(const Cmd: Char; const A: string);
@@ -629,9 +683,11 @@ begin
 end;
 
 procedure TDzTCPClient.int_OnConnect(Sender: TObject; Socket: TCustomWinSocket);
-var LoginMsg: string;
+var 
+  LoginMsg: string;
 begin
   MonConnectionLost := True; //enable connection lost monitoring
+  Reconnection.Challenge := False;
 
   if FKeepAlive then
     EnableKeepAlive(Socket, FKeepAliveInterval);
@@ -654,11 +710,71 @@ begin
   if Assigned(FOnDisconnect) then
     FOnDisconnect(Self, TDzSocket(C.Socket), WasConnected);
 
-  if MonConnectionLost then //disconnect command not by client
+  if MonConnectionLost then //disconnection did not come from the client
   begin
     if Assigned(FOnConnectionLost) then
       FOnConnectionLost(Self, TDzSocket(C.Socket));
+
+    if FAutoReconnect then
+    begin
+      Reconnection.Challenge := True;
+      Reconnection.Attempt := 0;
+
+      if Reconnection.Handle=0 then
+        Reconnection.Handle := AllocateHWnd(ReconnectWndProc);
+    end;
   end;
+
+  if Reconnection.Challenge then
+  begin
+    if (FAutoReconnectAttempts=0) or (Reconnection.Attempt<FAutoReconnectAttempts) then
+    begin
+      if SetTimer(Reconnection.Handle, INT_RECONNECTION_TIMER_ID, FAutoReconnectInterval, nil) = 0 then
+        raise Exception.Create('Failed to create internal reconnection timer');
+      Reconnection.TimerEnabled := True;
+    end else
+      Reconnection.Challenge := False;
+  end;
+end;
+
+procedure TDzTCPClient.ReconnectWndProc(var Msg: TMessage);
+var
+  Cancel: Boolean;
+begin
+  if Msg.Msg <> WM_TIMER then Exit;
+
+  ClearTimer;
+
+  Inc(Reconnection.Attempt);
+  if Assigned(FOnReconnect) then
+  begin
+    Cancel := False;
+    FOnReconnect(Self, TDzSocket(C.Socket), Reconnection.Attempt, Cancel);
+    if Cancel then
+    begin
+      Reconnection.Challenge := False;
+      Exit;
+    end;
+  end;
+
+  DoInternalConnect; //try to reconnect
+end;
+
+procedure TDzTCPClient.ClearTimer;
+begin
+  if Reconnection.TimerEnabled then
+  begin
+    if not KillTimer(Reconnection.Handle, INT_RECONNECTION_TIMER_ID) then
+      raise Exception.Create('Failed to destroy internal reconnection timer');
+
+    Reconnection.TimerEnabled := False;
+  end;
+end;
+
+procedure TDzTCPClient.StopReconnection;
+begin
+  ClearTimer;
+  Reconnection.Challenge := False;
 end;
 
 procedure TDzTCPClient.int_OnRead(Sender: TObject; Socket: TCustomWinSocket);
@@ -788,15 +904,22 @@ end;
 
 procedure TDzTCPServer.int_OnGetSocket(Sender: TObject; Socket: NativeInt; var SC: TServerClientWinSocket);
 begin
-  SC := TDzServerClientSocket.Create(Socket, S.Socket);
-  TDzServerClientSocket(SC).Comp := Self;
+  SC := TDzServerClientSocket.Create(Socket, S.Socket, Self);
+end;
+
+constructor TDzServerClientSocket.Create(Socket: TSocket;
+  ServerWinSocket: TServerWinSocket; ServerComp: TDzTCPServer);
+begin
+  inherited Create(Socket, ServerWinSocket);
+  Comp := ServerComp;
+  Cache := TDzSocketCache.Create;
 end;
 
 destructor TDzServerClientSocket.Destroy; // !!!
 begin
   //Comp.OnClientDisconnect(nil, Self); - here the socket object does not exist anymore!!!
 
-  if Assigned(Cache) then Cache.Free;
+  Cache.Free;
 
   if Comp.AutoFreeObjs then
     if Assigned(Data) then TObject(Data).Free;
