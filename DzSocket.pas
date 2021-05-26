@@ -395,32 +395,43 @@ const
 
 type
   TMsgSize = Integer;
-  EReading = class(Exception);
 
 procedure SockRead(Comp: TComponent; Socket: TCustomWinSocket;
    EvError: TDzSocketErrorEvent;
    Cmd_Proc: TDzSocketIntenalProc;
    Read_Proc: TDzSocketIntenalProc);
 
+  procedure DispatchError(E: Exception);
+  begin
+    if Assigned(EvError) then
+      EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
+  end;
+
   procedure ReadPart(const Msg: string);
   var
-    InternalCmd, Cmd: Char;
-    Data: string;
+    Proc: TDzSocketIntenalProc;
   begin
-    if Msg.Length<2 then raise EReading.Create('Invalid size of message part');
+    try
+      if Msg.Length<2 then raise Exception.Create('Invalid size of message part');
 
-    InternalCmd := Msg[1];
-    Cmd := Msg[2];
-    Data := Msg.Remove(0{0-based}, 2);
-
-    case InternalCmd of
-      CHAR_CMD_INT_CMD: Cmd_Proc(TDzSocket(Socket), Cmd, Data);
-      CHAR_CMD_INT_MSG: Read_Proc(TDzSocket(Socket), Cmd, Data);
-      else raise EReading.Create('Invalid internal command');
+      case Msg[1] of
+        CHAR_CMD_INT_CMD: Proc := Cmd_Proc;
+        CHAR_CMD_INT_MSG: Proc := Read_Proc;
+        else raise Exception.Create('Invalid internal command');
+      end;
+    except
+      on E: Exception do
+      begin
+        DispatchError(E);
+        Exit;
+      end;
     end;
+
+    Proc(TDzSocket(Socket), Msg[2], Msg.Remove(0{0-based}, 2));
   end;
 
 var
+  LStrStreams: TObjectList<TStringStream>;
   Cache: TDzSocketCache;
   Len: Integer;
   Buf: TBytes;
@@ -430,58 +441,61 @@ var
   OldStm: TMemoryStream;
   RemainingSize: Int64;
 begin
-  Cache := GetCache(Comp, Socket);
-  Cache.Single.Enter;
+  LStrStreams := TObjectList<TStringStream>.Create;
   try
-    Len := Socket.ReceiveLength;
-
-    SetLength(Buf, Len);
-    Socket.ReceiveBuf(Buf[0], Len);
-
-    Cache.Data.Seek(0, soEnd);
-    Cache.Data.Write(Buf, Len);
-
+    Cache := GetCache(Comp, Socket);
+    Cache.Single.Enter;
     try
-      while Cache.Data.Size >= ( SizeOf(IdentChar)+SizeOf(MsgSize) ) do
-      begin
-        Cache.Data.Seek(0, soBeginning);
-        Cache.Data.ReadData(IdentChar, SizeOf(IdentChar));
-        if IdentChar<>CHAR_IDENT_PART then
-          raise EReading.Create('Content does not start with ident char');
+      Len := Socket.ReceiveLength;
 
-        Cache.Data.ReadData(MsgSize, SizeOf(MsgSize));
-        if MsgSize<=0 then raise EReading.Create('Invalid message size');
-        if (Cache.Data.Size-Cache.Data.Position)<MsgSize then Break; //message not yet complete
+      SetLength(Buf, Len);
+      Socket.ReceiveBuf(Buf[0], Len);
 
-        M := TStringStream.Create(EmptyStr, TEncoding.UTF8);
-        try
+      Cache.Data.Seek(0, soEnd);
+      Cache.Data.Write(Buf, Len);
+
+      try
+        while Cache.Data.Size >= ( SizeOf(IdentChar)+SizeOf(MsgSize) ) do
+        begin
+          Cache.Data.Seek(0, soBeginning);
+          Cache.Data.ReadData(IdentChar, SizeOf(IdentChar));
+          if IdentChar<>CHAR_IDENT_PART then
+            raise Exception.Create('Content does not start with ident char');
+
+          Cache.Data.ReadData(MsgSize, SizeOf(MsgSize));
+          if MsgSize<=0 then raise Exception.Create('Invalid message size');
+          if (Cache.Data.Size-Cache.Data.Position)<MsgSize then Break; //message not yet complete
+
+          M := TStringStream.Create(EmptyStr, TEncoding.UTF8);
+          LStrStreams.Add(M);
+
           M.CopyFrom(Cache.Data, MsgSize);
-          ReadPart(M.DataString);
-        finally
-          M.Free;
-        end;
 
-        OldStm := Cache.Data;
-        Cache.Data := TMemoryStream.Create;
-        try
-          RemainingSize := OldStm.Size - OldStm.Position;
-          if RemainingSize>0 then
-            Cache.Data.CopyFrom(OldStm, RemainingSize);
-        finally
-          OldStm.Free;
+          OldStm := Cache.Data;
+          Cache.Data := TMemoryStream.Create;
+          try
+            RemainingSize := OldStm.Size - OldStm.Position;
+            if RemainingSize>0 then
+              Cache.Data.CopyFrom(OldStm, RemainingSize);
+          finally
+            OldStm.Free;
+          end;
+        end;
+      except
+        on E: Exception do
+        begin
+          Cache.Data.Clear;
+          DispatchError(E);
         end;
       end;
-    except
-      on E: EReading do
-      begin
-        Cache.Data.Clear;
-
-        if Assigned(EvError) then
-          EvError(Comp, TDzSocket(Socket), eeReceive, -1, Format('Error on buffer reading (%s)', [E.Message]));
-      end;
+    finally
+      Cache.Single.Leave;
     end;
+
+    for M in LStrStreams do
+      ReadPart(M.DataString);
   finally
-    Cache.Single.Leave;
+    LStrStreams.Free;
   end;
 end;
 
