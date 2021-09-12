@@ -23,14 +23,18 @@
 
 ## What's New
 
+- 09/12/2021 (Version 3.1)
+
+   - Delphi 11 auto-install support.
+
+<details>
+  <summary>Click here to view the entire changelog</summary>
+
 - 05/25/2021 (Version 3.0)
 
    - Redesigned data sending and receiving, using stream and UTF8 encoding, and avoiding receiving overload by using TCriticalSection.
    - Improved error handling on socket message receiving.
    - Included automatic reconnection support.
-
-<details>
-  <summary>Click here to view the entire changelog</summary>
 
 - 03/13/2021 (Version 2.6)
 
